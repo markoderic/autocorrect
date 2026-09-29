@@ -9,7 +9,7 @@ for word in ["teh", "chek", "recieve", "wierd", "frend", "receving", "capitazed"
         let range = NSRange(location: prefix.utf16.count, length: word.utf16.count)
         let correction = checker.correction(forWordRange: range, in: text, language: "en_US", inSpellDocumentWithTag: tag)
         let guesses = checker.guesses(forWordRange: range, in: text, language: "en_US", inSpellDocumentWithTag: tag) ?? []
-        let isolated = checker.correction(forWordRange: isolatedRange, in: word, language: "en_US", inSpellDocumentWithTag: tag)
+        let isolated = checker.correction(forWordRange: isolatedRange, in: word + " ", language: "en_US", inSpellDocumentWithTag: tag)
         print("FIXTURE \(text.debugDescription): correction=\(correction ?? "nil") guesses=\(guesses.prefix(6)) isolated=\(isolated ?? "nil")")
     }
 }

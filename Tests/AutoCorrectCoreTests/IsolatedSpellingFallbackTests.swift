@@ -12,6 +12,8 @@ final class IsolatedSpellingFallbackTests: XCTestCase {
             contextualGuesses: ["The", "tea"], isolatedCorrection: "the"), "the")
         XCTAssertEqual(CorrectionPolicy.isolatedFallback(for: "frend", contextualCorrection: nil,
             contextualGuesses: ["Fred", "friend", "trend"], isolatedCorrection: "friend"), "friend")
+        XCTAssertEqual(CorrectionPolicy.isolatedFallback(for: "capitazed", contextualCorrection: nil,
+            contextualGuesses: ["captioned", "capitalized"], isolatedCorrection: "capitalized"), "capitalized")
     }
 
     func testDisagreementUnsupportedRanksAndUnsafeEditsStillRefuse() {
@@ -24,7 +26,7 @@ final class IsolatedSpellingFallbackTests: XCTestCase {
         XCTAssertNil(CorrectionPolicy.isolatedFallback(for: "recieve", contextualCorrection: nil,
             contextualGuesses: ["recieve", "receive"], isolatedCorrection: "receive"))
         for (word, target) in ["har": "that", "tp": "to", "TEH": "the", "thier": "Their",
-                              "teh.txt": "the", "capitazed": "capitalized", "teh": "the\n"] {
+                              "teh.txt": "the", "abcd": "capitalized", "teh": "the\n"] {
             XCTAssertNil(CorrectionPolicy.isolatedFallback(for: word, contextualCorrection: nil,
                 contextualGuesses: [target], isolatedCorrection: target))
         }

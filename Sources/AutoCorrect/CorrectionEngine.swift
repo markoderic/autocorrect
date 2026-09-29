@@ -305,7 +305,9 @@ final class CorrectionEngine {
         if let writing = EnglishWritingRules.replacement(for: word, language: preferences.language) {
             return Assessment(misspelled: true, replacement: writing, automatic: true)
         }
-        let text = context ?? word
+        // Older spellcheck services require a completed word, including its delimiter,
+        // to return an automatic recommendation even when they can supply guesses.
+        let text = context ?? (word + " ")
         let wordRange = range ?? NSRange(location: 0, length: (word as NSString).length)
         let key = preferences.language + ":" + String(preferences.normalizesProductNames) + ":" + String(preferences.separatesJoinedWords) + ":" + text + ":" + String(wordRange.location)
         if let value = cache[key] { return value }
@@ -354,7 +356,7 @@ final class CorrectionEngine {
             var confident = preserveCompound ? nil : CorrectionPolicy.preferredAutomaticReplacement(for: word, systemCorrection: proposed, guesses: guesses)
             if confident == nil, !preserveCompound, proposed == nil, text != word {
                 let isolated = checker.correction(forWordRange: NSRange(location: 0, length: word.utf16.count),
-                    in: word, language: preferences.language, inSpellDocumentWithTag: spellDocument)
+                    in: word + " ", language: preferences.language, inSpellDocumentWithTag: spellDocument)
                 confident = CorrectionPolicy.isolatedFallback(for: word, contextualCorrection: proposed,
                     contextualGuesses: guesses, isolatedCorrection: isolated)
             }

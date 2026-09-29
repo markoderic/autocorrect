@@ -87,7 +87,7 @@ public enum CorrectionPolicy {
 
     /// macOS can omit its automatic recommendation in a sentence while retaining
     /// ranked guesses and an isolated-word recommendation. Reconcile those two
-    /// signals only for a supported one-edit repair; never override a conflicting
+    /// signals only through the existing confidence gates; never override a conflicting
     /// contextual recommendation or search an unlimited list of guesses.
     public static func isolatedFallback(for original: String, contextualCorrection: String?,
                                         contextualGuesses: [String], isolatedCorrection: String?) -> String? {
@@ -98,7 +98,7 @@ public enum CorrectionPolicy {
               !contextualGuesses.prefix(5).contains(where: {
                   UserDictionary.normalizedKey($0) == UserDictionary.normalizedKey(original)
               }) else { return nil }
-        return confidentReplacement(for: original, suggestion: isolatedCorrection)
+        return preferredAutomaticReplacement(for: original, systemCorrection: isolatedCorrection, guesses: contextualGuesses)
     }
 
     /// Chooses from the native spell checker's contextual correction and ranked guesses.
