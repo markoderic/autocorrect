@@ -14,6 +14,9 @@ jobs:
         run: swift --version
       - name: Tests
         run: swift test --build-system native
+      - name: Fixed dictionary diagnostics on failure
+        if: failure()
+        run: swift scripts/diagnose-spelling.swift
       - name: Build universal app
         run: scripts/build.sh
       - name: Upload app archive

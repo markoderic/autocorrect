@@ -33,7 +33,12 @@ final class ReleaseAccuracyCorpusTests: XCTestCase {
         ]
         for (source, expected) in pairs {
             for prefix in ["", "please check ", "I typed "] {
-                XCTAssertEqual(engine.suggestion(in: prefix + source + " "), expected, prefix + source)
+                var native = ""
+                engine.nativeAssessmentObserver = { _, miss, correction, guesses in
+                    native = "miss=\(miss) correction=\(correction ?? "nil") guesses=\(guesses)"
+                }
+                let result = engine.suggestion(in: prefix + source + " ")
+                XCTAssertEqual(result, expected, prefix + source + ": " + native)
             }
         }
     }
