@@ -73,6 +73,34 @@ public enum CorrectionPolicy {
     /// This is a confidence gate, not a dictionary: callers must establish that the source
     /// is misspelled and obtain suggestions from a local spell checker first.
     public static func confidentReplacement(for original: String, suggestion: String) -> String? {
+        validatedReplacement(for: original, suggestion: suggestion, allowShortInsertion: false)
+    }
+
+    /// Chooses from the native spell checker's contextual correction and ranked guesses.
+    /// Call only after the native checker identifies `original` as misspelled. For three
+    /// ASCII consonants, prefer a guess that preserves every typed letter and inserts one
+    /// vowel (for example, "ths" → "this") over a substitution. Otherwise, require the
+    /// native automatic recommendation and a conservative edit-distance gate. Three-letter
+    /// words may gain one letter or transpose two; substitutions and deletions stay blocked.
+    /// Ranking resolves multiple vowel insertions, so this cannot infer intent perfectly.
+    public static func preferredAutomaticReplacement(for original: String, systemCorrection: String?, guesses: [String]) -> String? {
+        guard isPlainWord(original), hasSafeCase(original) else { return nil }
+        let source = Array(UserDictionary.normalizedKey(original))
+        if source.count == 3, source.allSatisfy({ "bcdfghjklmnpqrstvwxz".contains($0) }) {
+            for guess in guesses {
+                let target = Array(UserDictionary.normalizedKey(guess))
+                guard isSingleVowelInsertion(source, target),
+                      let replacement = validatedReplacement(for: original, suggestion: guess, allowShortInsertion: true) else {
+                    continue
+                }
+                return replacement
+            }
+        }
+        guard let systemCorrection else { return nil }
+        return validatedReplacement(for: original, suggestion: systemCorrection, allowShortInsertion: true)
+    }
+
+    private static func validatedReplacement(for original: String, suggestion: String, allowShortInsertion: Bool) -> String? {
         guard isPlainWord(original), hasSafeCase(original), isPlainWord(suggestion),
               hasSafeCase(suggestion) else { return nil }
         let source = original.precomposedStringWithCanonicalMapping.lowercased()
@@ -82,7 +110,8 @@ public enum CorrectionPolicy {
         let right = Array(target)
         guard left.count >= 3 else { return nil }
         let transposition = isAdjacentTransposition(left, right)
-        guard (left.count == 3 && transposition) ||
+        let shortInsertion = allowShortInsertion && right.count == left.count + 1 && isSingleEdit(left, right)
+        guard (left.count == 3 && (transposition || shortInsertion)) ||
                 (left.count >= 4 && (transposition || isSingleEdit(left, right))) else {
             return nil
         }
@@ -127,6 +156,13 @@ public enum CorrectionPolicy {
         guard mismatches.count == 2, mismatches[1] == mismatches[0] + 1 else { return false }
         let index = mismatches[0]
         return left[index] == right[index + 1] && left[index + 1] == right[index]
+    }
+
+    private static func isSingleVowelInsertion(_ source: [Character], _ target: [Character]) -> Bool {
+        guard target.count == source.count + 1 else { return false }
+        var index = 0
+        while index < source.count, source[index] == target[index] { index += 1 }
+        return "aeiou".contains(target[index]) && source[index...].elementsEqual(target[(index + 1)...])
     }
 
     private static func isSingleEdit(_ left: [Character], _ right: [Character]) -> Bool {

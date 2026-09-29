@@ -4,7 +4,7 @@ A small native macOS menu bar app that corrects spelling when you finish typing 
 
 Requires **macOS 13 Ventura or later**, on Apple silicon or Intel.
 
-**0.2.0 is a preview.** Unit tests, universal packaging, local launch, and login registration have been checked. Real typing and underline placement across other apps still need permission-enabled testing; see [validation](docs/VALIDATION.md).
+**0.2.1 is a preview.** Unit tests, universal packaging, local launch, and login registration have been checked. Compatibility with individual editors and underline placement still need real keyboard testing; see [validation](docs/VALIDATION.md).
 
 ## What it does
 
@@ -17,14 +17,14 @@ Requires **macOS 13 Ventura or later**, on Apple silicon or Intel.
 - **Show Spelling Underlines:** optionally draw a red wavy underline beneath the latest completed possible misspelling. This requires the host app to expose the word's on-screen bounds. It clears on typing, clicking, scrolling, app switching, or after five seconds. It does not continuously mark the whole document.
 - English (US) is the default; the language selector is in Settings. Uncertain dictionary suggestions require approval even in automatic mode.
 - Automatically requests launch at login on first launch; you can turn it off in the menu bar.
-- Works in compatible text fields across native and browser apps through macOS Accessibility.
+- Uses read-only macOS Accessibility to check the field, then native keyboard input to correct it without temporarily selecting the word.
 - Runs in the background without a Dock icon. Settings opens only when requested.
 
-This release handles **spelling**, not grammar, tone, or rewriting. Apple's dictionaries cover common and uncommon words, but are not an exhaustive list of every English word, name, or technical term. A misspelling without a reliable automatic correction is flagged for review when supported; no correction is guaranteed for every word.
+This release handles **spelling**, not grammar, tone, or rewriting. Apple's dictionaries cover common and uncommon words, but are not an exhaustive list of every English word, name, or technical term. Short missing-letter typos now use native-ranked suggestions too: for example, `ths → this` and `frm → from`. These are general edit rules, not a fixed list of typos; ambiguous words can still be wrong or left unchanged. A misspelling without a reliable automatic correction is flagged for review when supported; no correction is guaranteed for every word.
 
 ## Install
 
-Download `AutoCorrect-0.2.0-universal.zip` from [Releases](https://github.com/markoderic/autocorrect/releases), unzip it, and move **AutoCorrect.app** to **Applications**. Open it and look for its menu bar item.
+Download `AutoCorrect-0.2.1-universal.zip` from [Releases](https://github.com/markoderic/autocorrect/releases), unzip it, and move **AutoCorrect.app** to **Applications**. Open it and look for its menu bar item.
 
 Release builds are **ad-hoc signed and not Apple notarized**. macOS may block the first launch of a downloaded copy. If you trust the source, attempt to open the app, then go to **System Settings → Privacy & Security → Open Anyway** and confirm. Follow the macOS instructions shown for your version. You do not need to disable Gatekeeper.
 
@@ -52,7 +52,7 @@ The cask installs the same app and has the same permissions and first-launch req
 
 ## Compatibility and privacy
 
-AutoCorrect relies on each app exposing a usable text field through macOS Accessibility. Some browser editors, custom controls, terminals, remote desktops, and apps with restricted accessibility will not work. It skips password fields, unsupported fields, and input methods that use composition (IME). Common coding apps, terminals, and password managers are paused by default; use **Paused Apps** to change those exclusions. It checks that the focus, selection, and surrounding text still match before applying a correction. It does not promise support for every app.
+AutoCorrect relies on each app exposing a usable text field through macOS Accessibility. Some browser editors, custom controls, terminals, remote desktops, and apps with restricted accessibility will not work. It skips password fields, unsupported fields, and input methods that use composition (IME). Common coding apps, terminals, and password managers are paused by default; use **Paused Apps** to change those exclusions. It checks that the focus, selection, and surrounding text still match before applying a correction. Corrections no longer write selected text through Accessibility, which could leave a word selected and cause the next keystroke to overwrite it. A complete keyboard edit is prepared before anything is deleted; stale edits are canceled, and verification never retries a deletion. Original words and their trailing delimiters must be ASCII for predictable backspace behavior; the preceding text and replacement may contain Unicode. It does not promise support for every app.
 
 Spelling checks run locally through `NSSpellChecker`. AutoCorrect does not send your text to a server or save a typing history. It inspects at most 256 UTF-16 units before the cursor, with a bounded fallback for small fields, and caches up to 256 spelling results in memory. App exclusions, deliberately ignored words, and settings are stored locally. macOS may also apply its own spelling corrections; if you see conflicting behavior, disable one of the correction systems for that app.
 
@@ -75,8 +75,8 @@ The build script compiles **arm64 and x86_64**, combines them into a universal e
 
 ```text
 dist/AutoCorrect.app
-dist/AutoCorrect-0.2.0-universal.zip
-dist/AutoCorrect-0.2.0-universal.zip.sha256
+dist/AutoCorrect-0.2.1-universal.zip
+dist/AutoCorrect-0.2.1-universal.zip.sha256
 ```
 
 It can be called from any working directory. The installer uses `/Applications` when writable, otherwise `~/Applications`. Use `--user` to choose `~/Applications`, `--no-open` to install without launching, and `--replace` to replace an existing installation. Quit AutoCorrect before replacing it; the installer preserves the previous bundle alongside the new one.
@@ -97,7 +97,7 @@ The installed binary also supports `--diagnostics` (permission and login status 
 
 For a manual check after granting permissions:
 
-1. Open a plain text document in TextEdit and type a common misspelling followed by a space. Confirm it changes in automatic mode.
+1. Open a disposable plain text document in TextEdit. Type `teh `, `ths `, `mispell `, and then continue with `next word`. Confirm the correction and the following text both remain, with no selection left behind. Repeat with punctuation and emoji before the misspelling.
 2. Switch on **Ask Before Correcting**. Type a misspelling and a space, then open the menu without typing another key. Confirm the text stays unchanged until you choose **Apply** within 30 seconds.
 3. Move the cursor or change focus before approving. Confirm a stale suggestion does not change another field.
 4. Exclude TextEdit, then repeat the misspelling and confirm AutoCorrect leaves it alone.

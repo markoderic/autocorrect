@@ -1,3 +1,22 @@
+# 0.2.1 validation
+
+Checked September 29, 2026 on Apple silicon, macOS 26.6, Swift 6.4.
+
+- Replaced selected-text Accessibility writes with a prebuilt native keyboard sequence. Production Accessibility code now only reads the field and never creates a temporary selection. The old failure path could leave the replacement selected, letting the next typed key erase it.
+- Revalidates focus, collapsed caret, snapshot text, physical-key counter, app exclusion, input source, and request generation before posting the edit. New input cancels an edit that has not started. A text-free trigger is consumed; all replacement events are inserted together from its event-tap callback.
+- Verification is read-only and accepts continued typing after the expected replacement. Failed verification never retries deletion. No full-field replacement, clipboard use, or external service was added.
+- Local native dictionary checks: `teh → the`, `ths → this`, `frm → from`, `thsi → this`, `helllo → hello`, `recieve → receive`, `speling → spelling`, `mispell → misspell`. `wth`, `world`, `Marko`, and `GitHub` remained unchanged. This is a sample, not a dictionary coverage measurement; ambiguous short words can still be wrong or left unchanged.
+- The short-word policy uses ranked native guesses and general missing-letter rules, with surrounding text supplied to the native correction API. No fixed typo mapping was added.
+- ChatGPT was not added to the excluded apps. Existing preferences, ignored words, custom corrections, permissions, and login registration are preserved.
+- Direct automation of the user's current desktop chat app was blocked by the computer-use tool. Attempts in disposable TextEdit/Chrome fields did not establish a physical-keyboard end-to-end result. **Desktop ChatGPT compatibility and the full real-typing path remain unverified**; do not treat unit/event-construction tests as that verification.
+- Native keyboard delivery is not an atomic text-edit API. Editors that reject synthetic input may still be unsupported. Backspace edits are limited to ASCII originals and delimiters; Unicode prefixes and replacement payloads are preserved.
+
+- All 38 tests passed with 0 failures: 34 policy/dictionary/replacement-plan tests plus 4 native CGEvent-to-NSEvent construction tests. The native tests verify exact key-down payloads, backspace order, paired key-up events, cleared modifiers, synthetic markers, Unicode/case/contractions, and simulated next-word preservation. They do not post events to another application.
+- Universal arm64/x86_64 release compilation and strict signature verification passed. Final ZIP: 194,602 bytes; SHA-256 `8e862173ce809f96f6715cea9dab7771dd399840d5445dcde0a43382c44236b8`.
+- Installed app retains Accessibility and Input Monitoring permission and enabled login registration. Exact desktop-editor behavior still requires the interactive check stated above.
+
+---
+
 # 0.2.0 validation
 
 Checked September 29, 2026 on Apple silicon, macOS 26.6, Swift 6.4.

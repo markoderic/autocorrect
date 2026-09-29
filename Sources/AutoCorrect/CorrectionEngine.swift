@@ -92,7 +92,7 @@ final class CorrectionEngine {
               // A clipped window must not turn the end of an identifier into an apparent whole word.
               snapshot.windowStart == 0 || candidate.range.location > 0,
               !preferences.ignoredWords.contains(UserDictionary.normalizedKey(candidate.original)) else { return }
-        let result = assessment(candidate.original)
+        let result = assessment(candidate.original, context: snapshot.text, range: candidate.range)
         guard result.misspelled else { return }
         flaggedWord = candidate.original
         guard let replacement = result.replacement else {
@@ -117,23 +117,25 @@ final class CorrectionEngine {
         return result.misspelled && result.automatic ? result.replacement : nil
     }
 
-    private func assessment(_ word: String) -> Assessment {
+    private func assessment(_ word: String, context: String? = nil, range: NSRange? = nil) -> Assessment {
         let normalized = UserDictionary.normalizedKey(word)
         if preferences.ignoredWords.contains(normalized) { return Assessment(misspelled: false, replacement: nil, automatic: false) }
         if let custom = preferences.customCorrections[normalized] {
             return Assessment(misspelled: custom != word, replacement: custom, automatic: true)
         }
-        let key = preferences.language + ":" + word
+        let text = context ?? word
+        let wordRange = range ?? NSRange(location: 0, length: (word as NSString).length)
+        let key = preferences.language + ":" + text + ":" + String(wordRange.location)
         if let value = cache[key] { return value }
         let checker = NSSpellChecker.shared
         let misspelled = checker.checkSpelling(of: word, startingAt: 0, language: preferences.language, wrap: false, inSpellDocumentWithTag: spellDocument, wordCount: nil)
         var answer = Assessment(misspelled: false, replacement: nil, automatic: false)
         if misspelled.location != NSNotFound {
-            let wordRange = NSRange(location: 0, length: (word as NSString).length)
-            let proposed = checker.correction(forWordRange: wordRange, in: word, language: preferences.language, inSpellDocumentWithTag: spellDocument)
-            let confident = proposed.flatMap { CorrectionPolicy.confidentReplacement(for: word, suggestion: $0) }
+            let proposed = checker.correction(forWordRange: wordRange, in: text, language: preferences.language, inSpellDocumentWithTag: spellDocument)
+            let guesses = checker.guesses(forWordRange: wordRange, in: text, language: preferences.language, inSpellDocumentWithTag: spellDocument) ?? []
+            let confident = CorrectionPolicy.preferredAutomaticReplacement(for: word, systemCorrection: proposed, guesses: guesses)
             // Dictionary guesses can cover larger mistakes, but never apply them without approval.
-            let review = confident ?? proposed ?? checker.guesses(forWordRange: wordRange, in: word, language: preferences.language, inSpellDocumentWithTag: spellDocument)?.first
+            let review = confident ?? proposed ?? guesses.first
             answer = Assessment(misspelled: true, replacement: review, automatic: confident != nil)
         }
         if cache.count >= 256 { cache.removeAll(keepingCapacity: true) }
@@ -148,42 +150,78 @@ final class CorrectionEngine {
     }
 
     private func apply(_ proposal: Proposal) {
+        perform(proposal, isUndo: false, andIgnore: false)
+    }
+
+    /// Editing goes through the receiving app's normal keyboard pipeline. Accessibility
+    /// only reads the field; a failed check can never leave a word selected.
+    private func perform(_ proposal: Proposal, isUndo: Bool, andIgnore: Bool) {
         indicator.hide()
         flaggedWord = nil
         guard preferences.enabled, monitor.isRunning, Date().timeIntervalSince(proposal.created) < 30,
-              KeyboardMonitor.safeInputSource,
-              let bundle = NSRunningApplication(processIdentifier: proposal.snapshot.pid)?.bundleIdentifier,
-              !preferences.excludedApps.contains(bundle),
-              AccessibilityText.replace(snapshot: proposal.snapshot, localRange: proposal.range, with: proposal.replacement) else {
+              let plan = KeyboardReplacementPlan.make(text: proposal.snapshot.text, wordRange: proposal.range, replacement: proposal.replacement) else {
             status = "Text changed or field unsupported — skipped"
             onChange?()
             return
         }
-        correctionCount += 1
-        status = "Ready"
-        if let updated = AccessibilityText.snapshot(pid: proposal.snapshot.pid) {
-            let newRange = NSRange(location: proposal.snapshot.windowStart + proposal.range.location - updated.windowStart, length: (proposal.replacement as NSString).length)
-            if newRange.location >= 0, NSMaxRange(newRange) <= (updated.text as NSString).length,
-               (updated.text as NSString).substring(with: newRange) == proposal.replacement {
-                undoProposal = Proposal(snapshot: updated, range: newRange, original: proposal.replacement, replacement: proposal.original, created: Date())
+        let ticket = generation
+        monitor.replace(plan, validate: { [weak self] in
+            guard let self, self.generation == ticket, self.preferences.enabled,
+                  KeyboardMonitor.safeInputSource,
+                  let bundle = NSRunningApplication(processIdentifier: proposal.snapshot.pid)?.bundleIdentifier,
+                  !self.preferences.excludedApps.contains(bundle) else { return false }
+            return AccessibilityText.stillMatches(proposal.snapshot)
+        }, completion: { [weak self] posted in
+            guard let self else { return }
+            guard posted else {
+                if self.generation == ticket {
+                    self.status = "Text changed — skipped"
+                    self.onChange?()
+                }
+                return
             }
+            // Give the editor time to process its input queue. Verification is read-only:
+            // never repeat a deletion or overwrite the field when an editor responds slowly.
+            self.verify(proposal, plan: plan, ticket: ticket, isUndo: isUndo, andIgnore: andIgnore, attempt: 0)
+        })
+    }
+
+    private func verify(_ proposal: Proposal, plan: KeyboardReplacementPlan, ticket: UInt64,
+                        isUndo: Bool, andIgnore: Bool, attempt: Int) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(attempt == 0 ? 40 : 100)) { [weak self] in
+            guard let self else { return }
+            guard AccessibilityText.verifies(snapshot: proposal.snapshot, expectedText: plan.expectedText, expectedCaret: plan.expectedCaret) else {
+                if attempt < 2 {
+                    self.verify(proposal, plan: plan, ticket: ticket, isUndo: isUndo, andIgnore: andIgnore, attempt: attempt + 1)
+                } else if self.generation == ticket {
+                    self.status = "Editor did not confirm correction"
+                    self.onChange?()
+                }
+                return
+            }
+            self.correctionCount = max(0, self.correctionCount + (isUndo ? -1 : 1))
+            if andIgnore { self.preferences.ignoredWords.insert(UserDictionary.normalizedKey(proposal.replacement)) }
+            // Continued typing is fine, but Undo must never act on a newer word.
+            if self.generation == ticket {
+                self.status = isUndo ? "Correction undone" : "Ready"
+                if !isUndo, let updated = AccessibilityText.snapshot(pid: proposal.snapshot.pid),
+                   updated.caret == proposal.snapshot.windowStart + plan.expectedCaret {
+                    let location = proposal.snapshot.windowStart + proposal.range.location - updated.windowStart
+                    if location >= 0 {
+                        self.undoProposal = Proposal(snapshot: updated,
+                            range: NSRange(location: location, length: (proposal.replacement as NSString).length),
+                            original: proposal.replacement, replacement: proposal.original, created: Date())
+                    }
+                }
+            }
+            self.onChange?()
         }
-        onChange?()
     }
 
     func undo(andIgnore: Bool = false) {
         guard let proposal = undoProposal else { return }
         undoProposal = nil
-        guard monitor.isRunning, Date().timeIntervalSince(proposal.created) < 30, KeyboardMonitor.safeInputSource,
-              AccessibilityText.replace(snapshot: proposal.snapshot, localRange: proposal.range, with: proposal.replacement) else {
-            status = "Text changed — undo skipped"
-            onChange?()
-            return
-        }
-        correctionCount = max(0, correctionCount - 1)
-        if andIgnore { preferences.ignoredWords.insert(UserDictionary.normalizedKey(proposal.replacement)) }
-        status = "Correction undone"
-        onChange?()
+        perform(proposal, isUndo: true, andIgnore: andIgnore)
     }
 
     func ignorePendingWord() {

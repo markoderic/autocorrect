@@ -1,7 +1,7 @@
 import AppKit
 import ApplicationServices
 
-/// Bounded reads and targeted selected-text writes. Never replaces the whole field.
+/// Read-only Accessibility snapshots. Text and selections are never changed through AX.
 enum AccessibilityText {
     struct Snapshot {
         let element: AXUIElement
@@ -24,17 +24,6 @@ enum AccessibilityText {
         var range = CFRange()
         guard AXValueGetValue(value as! AXValue, .cfRange, &range) else { return nil }
         return range
-    }
-
-    static func setRange(_ range: CFRange, on element: AXUIElement) -> Bool {
-        var value = range
-        guard let boxed = AXValueCreate(.cfRange, &value) else { return false }
-        return AXUIElementSetAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, boxed) == .success
-    }
-
-    static func isSettable(_ element: AXUIElement, _ name: String) -> Bool {
-        var settable = DarwinBoolean(false)
-        return AXUIElementIsAttributeSettable(element, name as CFString, &settable) == .success && settable.boolValue
     }
 
     static func substring(_ element: AXUIElement, range: CFRange) -> String? {
@@ -69,8 +58,6 @@ enum AccessibilityText {
               let role = attribute(element, kAXRoleAttribute) as? String,
               [kAXTextFieldRole, kAXTextAreaRole, kAXComboBoxRole].contains(role),
               (attribute(element, kAXSubroleAttribute) as? String) != kAXSecureTextFieldSubrole,
-              isSettable(element, kAXSelectedTextRangeAttribute),
-              isSettable(element, kAXSelectedTextAttribute),
               let selected = range(element), selected.length == 0, selected.location > 0 else { return nil }
         // Extra preceding context prevents treating the tail of a long URL/token as a word.
         let start = max(0, selected.location - 256)
@@ -97,65 +84,11 @@ enum AccessibilityText {
         return text == snapshot.text && physicalKeyCount == snapshot.physicalKeyCount
     }
 
-    static func replace(snapshot: Snapshot, localRange: NSRange, with replacement: String) -> Bool {
-        let began = ProcessInfo.processInfo.systemUptime
-        func hasBudget() -> Bool { ProcessInfo.processInfo.systemUptime - began < 0.1 }
-        // Reserve a separate short cleanup window so a slow setter doesn't strand
-        // the temporary selection merely because the edit budget just expired.
-        func hasCleanupBudget() -> Bool { ProcessInfo.processInfo.systemUptime - began < 0.2 }
-        guard stillMatches(snapshot), localRange.location >= 0, localRange.length > 0,
-              NSMaxRange(localRange) <= (snapshot.text as NSString).length else { return false }
-        let range = CFRange(location: snapshot.windowStart + localRange.location, length: localRange.length)
-        let original = (snapshot.text as NSString).substring(with: localRange)
-        let expected = (snapshot.text as NSString).replacingCharacters(in: localRange, with: replacement)
-        let replacementLength = (replacement as NSString).length
-        let newCaret = snapshot.caret + replacementLength - localRange.length
-
-        func ownsOriginalSelection() -> Bool {
-            guard hasFocus(snapshot), let selected = self.range(snapshot.element),
-                  selected.location == range.location, selected.length == range.length,
-                  (attribute(snapshot.element, kAXSelectedTextAttribute) as? String) == original,
-                  substring(snapshot.element, range: CFRange(location: snapshot.windowStart, length: (snapshot.text as NSString).length)) == snapshot.text else { return false }
-            return true
-        }
-        func restoreOriginalCaretIfOwned() {
-            // A failed read/write may mean the user already moved or edited the field.
-            // Never overwrite that new selection with a stale saved caret.
-            if hasCleanupBudget(), ownsOriginalSelection(), hasCleanupBudget() {
-                _ = setRange(CFRange(location: snapshot.caret, length: 0), on: snapshot.element)
-            }
-        }
-
-        guard physicalKeyCount == snapshot.physicalKeyCount, hasBudget() else { return false }
-        guard setRange(range, on: snapshot.element) else {
-            restoreOriginalCaretIfOwned()
-            return false
-        }
-        // Confirm the exact selection before writing, including controls which ignore range setters.
-        guard ownsOriginalSelection(), physicalKeyCount == snapshot.physicalKeyCount, hasBudget() else {
-            restoreOriginalCaretIfOwned()
-            return false
-        }
-        let result = AXUIElementSetAttributeValue(snapshot.element, kAXSelectedTextAttribute as CFString, replacement as CFString)
-        guard result == .success else {
-            restoreOriginalCaretIfOwned()
-            return false
-        }
-        // AX success alone does not prove that the control implemented the setter.
-        guard hasCleanupBudget(), hasFocus(snapshot),
-              substring(snapshot.element, range: CFRange(location: snapshot.windowStart, length: (expected as NSString).length)) == expected,
-              let afterWrite = self.range(snapshot.element) else {
-            restoreOriginalCaretIfOwned()
-            return false
-        }
-        let replacementEnd = range.location + replacementLength
-        let selectedReplacement = afterWrite.location == range.location && afterWrite.length == replacementLength
-        let insertionCaret = afterWrite.length == 0 && (afterWrite.location == replacementEnd || afterWrite.location == newCaret)
-        guard selectedReplacement || insertionCaret, hasCleanupBudget(),
-              setRange(CFRange(location: newCaret, length: 0), on: snapshot.element),
-              hasFocus(snapshot), let finalRange = self.range(snapshot.element),
-              finalRange.location == newCaret, finalRange.length == 0,
-              substring(snapshot.element, range: CFRange(location: snapshot.windowStart, length: (expected as NSString).length)) == expected else { return false }
-        return true
+    /// Verification tolerates continued typing after the replaced suffix. It never retries a write.
+    static func verifies(snapshot: Snapshot, expectedText: String, expectedCaret: Int) -> Bool {
+        guard hasFocus(snapshot),
+              let selected = range(snapshot.element), selected.length == 0,
+              selected.location >= snapshot.windowStart + expectedCaret else { return false }
+        return substring(snapshot.element, range: CFRange(location: snapshot.windowStart, length: expectedCaret)) == expectedText
     }
 }

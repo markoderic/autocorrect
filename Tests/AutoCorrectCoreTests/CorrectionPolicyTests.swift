@@ -98,4 +98,46 @@ final class CorrectionPolicyTests: XCTestCase {
         XCTAssertNil(CorrectionPolicy.candidate(in: "TEH\n", caret: 4, caseExceptions: ["teh"]))
         XCTAssertNil(CorrectionPolicy.candidate(in: "TEH ", caret: 99, caseExceptions: ["teh"]))
     }
+
+    func testMissingVowelPreferredOverShortSubstitution() {
+        XCTAssertEqual(CorrectionPolicy.preferredAutomaticReplacement(for: "ths", systemCorrection: "the",
+                                                                      guesses: ["the", "this", "these", "those"]), "this")
+        XCTAssertEqual(CorrectionPolicy.preferredAutomaticReplacement(for: "wth", systemCorrection: "why",
+                                                                      guesses: ["why", "with", "worth"]), "with")
+        XCTAssertEqual(CorrectionPolicy.preferredAutomaticReplacement(for: "frm", systemCorrection: "for",
+                                                                      guesses: ["for", "from", "form"]), "from")
+        XCTAssertEqual(CorrectionPolicy.preferredAutomaticReplacement(for: "Ths", systemCorrection: "The",
+                                                                      guesses: ["The", "This", "These"]), "This")
+    }
+
+    func testVowelPreferencePreservesNativeRankingAndEveryTypedLetter() {
+        XCTAssertEqual(CorrectionPolicy.preferredAutomaticReplacement(for: "ths", systemCorrection: nil,
+                                                                      guesses: ["thus", "this"]), "thus")
+        XCTAssertNil(CorrectionPolicy.preferredAutomaticReplacement(for: "ths", systemCorrection: "the",
+                                                                    guesses: ["the", "these", "those", "thiss"]))
+        XCTAssertNil(CorrectionPolicy.preferredAutomaticReplacement(for: "ths", systemCorrection: nil,
+                                                                    guesses: ["THIS", "tHis", "this!", "this word"]))
+    }
+
+    func testSystemRecommendationAllowsShortMissingLetterAndFamiliarSwaps() {
+        for pair in [("wih", "with"), ("ths", "this"), ("teh", "the"), ("adn", "and"),
+                     ("recieve", "receive"), ("definately", "definitely"), ("helllo", "hello"),
+                     ("Helo", "hello")] {
+            let expected = pair.0.first?.isUppercase == true ? "Hello" : pair.1
+            XCTAssertEqual(CorrectionPolicy.preferredAutomaticReplacement(for: pair.0, systemCorrection: pair.1,
+                                                                          guesses: []), expected, "\(pair)")
+        }
+        // Non-vowel insertions in short words need the native automatic recommendation.
+        XCTAssertNil(CorrectionPolicy.preferredAutomaticReplacement(for: "wih", systemCorrection: nil, guesses: ["with"]))
+        XCTAssertNil(CorrectionPolicy.preferredAutomaticReplacement(for: "helo", systemCorrection: nil, guesses: ["hello"]))
+    }
+
+    func testPreferredAutomaticReplacementRetainsSafetyBoundaries() {
+        for pair in [("tp", "to"), ("ths", "the"), ("teh", "tea"), ("too", "to"), ("abcde", "world"),
+                     ("THS", "this"), ("tHs", "this"), ("ths", "This"), ("hellp", "Hello"),
+                     ("teh/", "the"), ("hello", "hello\n"), ("hello", "h3llo"), ("good", "good")] {
+            XCTAssertNil(CorrectionPolicy.preferredAutomaticReplacement(for: pair.0, systemCorrection: pair.1,
+                                                                        guesses: [pair.1]), "\(pair)")
+        }
+    }
 }

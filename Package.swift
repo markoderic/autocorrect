@@ -9,6 +9,7 @@ let package = Package(
     targets: [
         .target(name: "AutoCorrectCore"),
         .executableTarget(name: "AutoCorrect", dependencies: ["AutoCorrectCore"]),
-        .testTarget(name: "AutoCorrectCoreTests", dependencies: ["AutoCorrectCore"])
+        .testTarget(name: "AutoCorrectCoreTests", dependencies: ["AutoCorrectCore"]),
+        .testTarget(name: "AutoCorrectTests", dependencies: ["AutoCorrect", "AutoCorrectCore"])
     ]
 )
