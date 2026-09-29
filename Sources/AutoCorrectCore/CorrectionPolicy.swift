@@ -79,10 +79,14 @@ public enum CorrectionPolicy {
     /// Chooses from the native spell checker's contextual correction and ranked guesses.
     /// Call only after the native checker identifies `original` as misspelled. For three
     /// ASCII consonants, prefer a guess that preserves every typed letter and inserts one
-    /// vowel (for example, "ths" → "this") over a substitution. Otherwise, require the
-    /// native automatic recommendation and a conservative edit-distance gate. Three-letter
+    /// vowel (for example, "ths" → "this") over a substitution. First consider the
+    /// native automatic recommendation with a conservative edit-distance gate. Three-letter
     /// words may gain one letter or transpose two; substitutions and deletions stay blocked.
-    /// Ranking resolves multiple vowel insertions, so this cannot infer intent perfectly.
+    /// Beyond that gate, its first ranked guess can qualify: one edit for 5+ letters, or
+    /// two for 8+ letters with matching ends. A native two-edit automatic recommendation
+    /// may also qualify within the first three guesses when it is uniquely closest.
+    /// Another top-five guess at equal or closer distance blocks this fallback. These are
+    /// safety heuristics, not calibrated probabilities or proof of the writer's intent.
     public static func preferredAutomaticReplacement(for original: String, systemCorrection: String?, guesses: [String]) -> String? {
         guard isPlainWord(original), hasSafeCase(original) else { return nil }
         let source = Array(UserDictionary.normalizedKey(original))
@@ -96,8 +100,64 @@ public enum CorrectionPolicy {
                 return replacement
             }
         }
-        guard let systemCorrection else { return nil }
-        return validatedReplacement(for: original, suggestion: systemCorrection, allowShortInsertion: true)
+        if let systemCorrection,
+           let replacement = validatedReplacement(for: original, suggestion: systemCorrection, allowShortInsertion: true) {
+            return replacement
+        }
+        return rankedGuessReplacement(for: original, systemCorrection: systemCorrection, guesses: guesses)
+    }
+
+    private static func rankedGuessReplacement(for original: String, systemCorrection: String?, guesses: [String]) -> String? {
+        guard original.count >= 5, let first = guesses.first else { return nil }
+        let source = Array(UserDictionary.normalizedKey(original))
+        var selected = first
+        if let systemCorrection, isPlainWord(systemCorrection) {
+            let systemKey = UserDictionary.normalizedKey(systemCorrection)
+            if guesses.prefix(3).contains(where: { UserDictionary.normalizedKey($0) == systemKey }),
+               editDistance(source, Array(systemKey)) == 2 {
+                selected = systemCorrection
+            }
+        }
+        guard isPlainWord(selected), hasSafeCase(selected),
+              original.first?.isUppercase == true || selected.first?.isUppercase != true else { return nil }
+        let targetKey = UserDictionary.normalizedKey(selected)
+        let target = Array(targetKey)
+        let distance = editDistance(source, target)
+        guard distance > 0, distance <= 2 else { return nil }
+        if distance == 2 {
+            guard source.count >= 8, target.count >= 8, source.first == target.first, source.last == target.last,
+                  distance * 4 <= source.count else { return nil }
+        }
+        // Native rank alone is not a confidence score. Demand a full edit of separation
+        // from every other top-five guess and any different automatic recommendation.
+        let competitors = Array(guesses.prefix(5)) + (systemCorrection.map { [$0] } ?? [])
+        for competitor in competitors where isPlainWord(competitor) {
+            let key = UserDictionary.normalizedKey(competitor)
+            if key != targetKey, editDistance(source, Array(key)) <= distance { return nil }
+        }
+        return original.first?.isUppercase == true
+            ? targetKey.prefix(1).uppercased() + targetKey.dropFirst() : targetKey
+    }
+
+    /// Optimal-string-alignment distance: insertion, deletion, substitution, and adjacent
+    /// transposition. Work is bounded by our 32-character word limit and five native guesses.
+    /// Sources: https://norvig.com/spell-correct.html and https://github.com/wolfgarbe/SymSpell
+    /// Unlike those full correctors, this layer only validates candidates provided by macOS.
+    private static func editDistance(_ source: [Character], _ target: [Character]) -> Int {
+        var rows = Array(repeating: Array(repeating: 0, count: target.count + 1), count: source.count + 1)
+        for i in 0...source.count { rows[i][0] = i }
+        for j in 0...target.count { rows[0][j] = j }
+        guard !source.isEmpty, !target.isEmpty else { return max(source.count, target.count) }
+        for i in 1...source.count {
+            for j in 1...target.count {
+                let cost = source[i - 1] == target[j - 1] ? 0 : 1
+                rows[i][j] = min(rows[i - 1][j] + 1, rows[i][j - 1] + 1, rows[i - 1][j - 1] + cost)
+                if i > 1, j > 1, source[i - 1] == target[j - 2], source[i - 2] == target[j - 1] {
+                    rows[i][j] = min(rows[i][j], rows[i - 2][j - 2] + 1)
+                }
+            }
+        }
+        return rows[source.count][target.count]
     }
 
     private static func validatedReplacement(for original: String, suggestion: String, allowShortInsertion: Bool) -> String? {

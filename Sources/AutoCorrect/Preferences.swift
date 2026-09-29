@@ -24,6 +24,18 @@ final class Preferences {
         get { defaults.object(forKey: "capitalizesAfterPeriod") as? Bool ?? true }
         set { defaults.set(newValue, forKey: "capitalizesAfterPeriod") }
     }
+    var expandsAbbreviations: Bool {
+        get { defaults.object(forKey: "expandsAbbreviations") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "expandsAbbreviations") }
+    }
+    var normalizesProductNames: Bool {
+        get { defaults.object(forKey: "normalizesProductNames") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "normalizesProductNames") }
+    }
+    var checksContext: Bool {
+        get { defaults.object(forKey: "checksContext") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "checksContext") }
+    }
     var customCorrections: [String: String] {
         get { defaults.dictionary(forKey: "customCorrections") as? [String: String] ?? [:] }
         set { defaults.set(newValue, forKey: "customCorrections") }

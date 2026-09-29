@@ -44,21 +44,22 @@ final class KeyboardReplacementPlanTests: XCTestCase {
         }
     }
 
-    func testRejectsTrailingTextAndUnsafeDelimiters() {
-        for suffix in ["", " next", "x", "\t", "\n", "\r", "\0", "\u{7F}", "\u{00A0}", "/", "@", String(repeating: " ", count: 9)] {
+    func testRejectsUnsafeDelimitersAndSuffixes() {
+        for suffix in ["", "x", "\t", "\n", "\r", "\0", "\u{7F}", "\u{00A0}", "/", "@", " next\nline", " next\tword", " café", " next🙂", String(repeating: " ", count: 97)] {
             XCTAssertNil(plan("teh" + suffix, word: "teh", replacement: "the"), suffix.debugDescription)
         }
-        XCTAssertNotNil(plan("teh" + String(repeating: " ", count: 8), word: "teh", replacement: "the"))
+        XCTAssertNotNil(plan("teh" + String(repeating: " ", count: 96), word: "teh", replacement: "the"))
     }
 
     func testEmptyOrUnsafeReplacementNeverCreatesDeletionPlan() {
-        for replacement in ["", " ", "the next", "the\n", "\tthe", "the\0", "the!", "two-words", "'the", "the’", "a'b'c", String(repeating: "a", count: 65)] {
+        for replacement in ["", " ", "the\n", "\tthe", "the\0", "the\u{202E}", String(repeating: "a", count: 121)] {
             XCTAssertNil(plan("teh ", word: "teh", replacement: replacement), replacement.debugDescription)
         }
         XCTAssertNil(plan("teh ", word: "teh", replacement: "teh"))
         XCTAssertNotNil(plan("dont ", word: "dont", replacement: "don't"))
         XCTAssertNotNil(plan("dont ", word: "dont", replacement: "don’t"))
-        XCTAssertNotNil(plan("teh ", word: "teh", replacement: String(repeating: "a", count: 64)))
+        XCTAssertNotNil(plan("teh ", word: "teh", replacement: String(repeating: "a", count: 120)))
+        XCTAssertNotNil(plan("teh ", word: "teh", replacement: "The next word!"))
     }
 
     func testInvalidUTF16RangesFailWithoutOverflow() {
@@ -83,10 +84,11 @@ final class KeyboardReplacementPlanTests: XCTestCase {
         XCTAssertNotNil(plan(String(repeating: "x", count: 251) + " teh ", word: "teh", replacement: "the"))
         XCTAssertNil(plan(String(repeating: "x", count: 252) + " teh ", word: "teh", replacement: "the"))
         XCTAssertNil(plan(String(repeating: "🙂", count: 126) + " teh ", word: "teh", replacement: "the"))
-        let maximumWord = String(repeating: "a", count: 88)
-        XCTAssertEqual(plan(maximumWord + String(repeating: " ", count: 8), word: maximumWord, replacement: "word")?.deleteCount, 96)
-        let tooLong = String(repeating: "a", count: 89)
-        XCTAssertNil(plan(tooLong + String(repeating: " ", count: 8), word: tooLong, replacement: "word"))
+        let maximumWord = String(repeating: "a", count: 120)
+        XCTAssertEqual(plan(maximumWord + String(repeating: " ", count: 96), word: maximumWord, replacement: "word")?.deleteCount, 216)
+        let tooLong = String(repeating: "a", count: 121)
+        XCTAssertNil(plan(tooLong + " ", word: tooLong, replacement: "word"))
+        XCTAssertNil(plan(maximumWord + String(repeating: " ", count: 97), word: maximumWord, replacement: "word"))
     }
     func testSentenceCapitalizationAfterOpeningSingleQuote() throws {
         for text in ["Done. 'hello ", "Done. ‘hello "] {
@@ -94,6 +96,61 @@ final class KeyboardReplacementPlanTests: XCTestCase {
             let edit = try XCTUnwrap(KeyboardReplacementPlan.make(text: text, wordRange: candidate.range, replacement: "Hello"))
             XCTAssertEqual(edit.expectedText, text.replacingOccurrences(of: "hello", with: "Hello"))
         }
+    }
+
+    func testPhraseExpansionAndReversalPreserveTrailingTyping() throws {
+        let original = "I said idk what happens next"
+        let expansion = try XCTUnwrap(plan(original, word: "idk", replacement: "I don't know"))
+        XCTAssertEqual(expansion.expectedText, "I said I don't know what happens next")
+        XCTAssertEqual(String(original.dropLast(expansion.deleteCount)) + expansion.insertion, expansion.expectedText)
+        let undo = try XCTUnwrap(plan(expansion.expectedText, word: "I don't know", replacement: "idk"))
+        XCTAssertEqual(undo.expectedText, original)
+        XCTAssertEqual(String(expansion.expectedText.dropLast(undo.deleteCount)) + undo.insertion, original)
+        XCTAssertEqual(undo.expectedCaret, original.utf16.count)
+    }
+
+    func testContextualPreviousWordCorrectionPreservesExactFollowingText() throws {
+        let text = "🙂 I found wierd behavior, in v2."
+        let edit = try XCTUnwrap(plan(text, word: "wierd", replacement: "weird"))
+        XCTAssertEqual(edit.insertion, "weird behavior, in v2.")
+        XCTAssertEqual(edit.expectedText, "🙂 I found weird behavior, in v2.")
+        XCTAssertEqual(edit.expectedCaret, edit.expectedText.utf16.count)
+    }
+
+    func testPhraseReversalRejectsClippedWordsNonletterEdgesAndUnicodeDeletion() {
+        for text in ["prefixI don't know next", "@I don't know next", "obj.I don't know next"] {
+            XCTAssertNil(plan(text, word: "I don't know", replacement: "idk"), text)
+        }
+        for phrase in ["I don't know!", "'I don't know", "I don't kn0w0", "I don’t know", "I don't\nknow", "I don't\tknow"] {
+            XCTAssertNil(plan(phrase + " next", word: phrase, replacement: "idk"), phrase)
+        }
+        XCTAssertNil(plan("I don't knowmore ", word: "I don't know", replacement: "idk"))
+    }
+
+    func testRecordedExpansionReversalAllowsPunctuationNumbersAndSymbols() throws {
+        for phrase in ["I don't know!", "42", "@Marko", "$100", "(thanks)"] {
+            let original = "I said idk then continued"
+            let expansion = try XCTUnwrap(plan(original, word: "idk", replacement: phrase))
+            let range = (expansion.expectedText as NSString).range(of: phrase)
+            XCTAssertNil(KeyboardReplacementPlan.make(text: expansion.expectedText, wordRange: range, replacement: "idk"), phrase)
+            let undo = try XCTUnwrap(KeyboardReplacementPlan.make(text: expansion.expectedText, wordRange: range,
+                                                                replacement: "idk", reversingExpansion: true))
+            XCTAssertEqual(undo.expectedText, original, phrase)
+            XCTAssertEqual(String(expansion.expectedText.dropLast(undo.deleteCount)) + undo.insertion, original, phrase)
+        }
+    }
+
+    func testExpansionReversalOptInRetainsDeletionAndBoundarySafeguards() {
+        for phrase in ["café!", "hello🙂", "hello\nworld", "hello\tworld"] {
+            let text = phrase + " next"
+            XCTAssertNil(KeyboardReplacementPlan.make(text: text, wordRange: (text as NSString).range(of: phrase),
+                                                      replacement: "idk", reversingExpansion: true), phrase)
+        }
+        XCTAssertNil(KeyboardReplacementPlan.make(text: "prefix42 next", wordRange: NSRange(location: 6, length: 2),
+                                                  replacement: "idk", reversingExpansion: true))
+        // A UTF-16 range cannot use reversal to delete only part of a composed character.
+        XCTAssertNil(KeyboardReplacementPlan.make(text: "e\u{301} ", wordRange: NSRange(location: 0, length: 1),
+                                                  replacement: "idk", reversingExpansion: true))
     }
 
 }

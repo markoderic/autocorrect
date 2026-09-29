@@ -1,3 +1,23 @@
+# 0.3.0 validation
+
+Checked September 29, 2026 on Apple silicon, macOS 26.6, Swift 6.4.
+
+- **93 tests passed, zero failures.** Includes 51 labeled deterministic spelling fixtures (27 positive, 24 negative), native-ranking disagreement regressions, phrase validation/reversal, exact trailing-text preservation, bounded word-boundary backlog, context suggestions, exact UTF-16 undo anchors, and integration of engine preferences/overrides. This is regression coverage, not a measured English accuracy percentage or a physical-keyboard stress test.
+- Final installed engine smoke checks: `i → I`, `im → I'm`, `doesnt → doesn't`, `ti → it`, `ths → this`, `idk → I don't know`, `iphone → iPhone`, `ui → UI`, `capitazed → capitalized`, `inconvient → inconvenient`, `acomodation → accommodation`, `probblity → probability`. Valid samples `ill`, `well`, `were`, `its`, `world`, `Marko`, `GitHub` remain unchanged. Native dictionary ranking can vary by context and macOS version.
+- Native settings UI visually inspected. Preview visibly produced `I I don't know iPhone UI capitalized` for `i idk iphone ui capitazed`; `lets go` showed `let's go (approval required)`. These exercise the real engine in the app window, not editing in a different app.
+- Added a temporary phrase through the UI, disabled expansions, restarted/replaced the app, and verified both persisted. The temporary phrase was then removed and expansions restored to on. English (US), context suggestions, sentence capitalization, and underlines are on. Existing user settings are otherwise preserved.
+- A TextEdit automation check produced `i next` but **did not enter the keyboard listener**, as established by phase-only tracing. This does not count as an end-to-end pass or as evidence of physical-keyboard failure. Real-keyboard rapid typing, global undo delivery, and app-by-app validation remain required. The earlier user-confirmed Claude result below belongs to 0.2.3; do not infer current universal compatibility from it.
+- Static review found and fixed stale AX read drops, lost undo records on canceled delivery, and verification callbacks crossing typing sessions. Reads retry at most three times; already-posted edits never retry deletions. Focus, mouse, navigation, control keys, and setting changes retire the session, while ordinary subsequent typing preserves queued boundaries. These safeguards still need real-editor stress testing.
+- Universal arm64/x86_64 release compilation and strict signature verification passed. ZIP: 1,449,441 bytes. SHA-256 `6fcef8b93aaeb59dc0173ac8f35e9f6f6aa1b9230700ce9593c07ba27ef6f8b0`. Installed app allocation approximately 1.9 MiB, including the new native icon. Public build remains ad-hoc signed and not notarized.
+- A short background-process snapshot after launch showed about 101 MiB RSS and 0.1% CPU. This is not a sustained active-typing or battery benchmark; opening Settings can change memory use.
+- Installed Accessibility, Input Monitoring, keyboard listener, keyboard layout, and launch-at-login registration checks pass. Actual logout/login was not exercised. Final normal launch has phase tracing off.
+
+## 1.0 gates still open
+
+Use a disposable field in TextEdit, Chrome, Claude desktop, and the desktop chat composer. With host autocorrection disabled for attribution, physically type `i ths next`, `idk next`, and `capitazed next`; verify exact text and no selection. Reverse the last correction with Control–Option–Command–Z after typing the next word; repeat with phrase expansions, fast input, focus changes, and an emoji prefix. Check approval-only context changes and paused apps. Record actual app versions and pass/fail/unsupported results. Complete sustained active/idle resource measurement and signed/notarized distribution before declaring a stable 1.0.
+
+---
+
 # 0.2.3 validation
 
 Checked September 29, 2026 on Apple silicon, macOS 26.6, Swift 6.4.

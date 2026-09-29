@@ -1,5 +1,6 @@
 import AppKit
 import ServiceManagement
+import AutoCorrectCore
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let preferences = Preferences()
@@ -7,14 +8,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem!
     private let menu = NSMenu()
     private var workspaceObserver: NSObjectProtocol?
-    private lazy var settings = SettingsController(preferences: preferences) { [weak self] in self?.engine.refresh() }
+    private var settings: SettingsController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        NSApp.applicationIconImage = AppIcon.applicationImage()
+        installMainMenu()
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.menu = menu
         menu.delegate = self
-        engine.onChange = { [weak self] in self?.updateIcon() }
+        engine.onChange = { [weak self] in self?.updateIcon(); self?.settings?.updateStatus() }
         workspaceObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] _ in
             self?.engine.focusChanged()
             self?.updateIcon()
@@ -37,6 +40,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
+    private func installMainMenu() {
+        let main = NSMenu()
+        let appItem = NSMenuItem(); let appMenu = NSMenu(title: "AutoCorrect")
+        let settingsItem = NSMenuItem(title: "AutoCorrect Settings…", action: #selector(showSettings), keyEquivalent: ",")
+        settingsItem.target = self; appMenu.addItem(settingsItem); appMenu.addItem(.separator())
+        let quitItem = NSMenuItem(title: "Quit AutoCorrect", action: #selector(quit), keyEquivalent: "q")
+        quitItem.target = self; appMenu.addItem(quitItem); appItem.submenu = appMenu; main.addItem(appItem)
+        let editItem = NSMenuItem(); let edit = NSMenu(title: "Edit")
+        for (title, action, key) in [("Undo", "undo:", "z"), ("Cut", "cut:", "x"), ("Copy", "copy:", "c"), ("Paste", "paste:", "v"), ("Select All", "selectAll:", "a")] {
+            edit.addItem(NSMenuItem(title: title, action: Selector(action), keyEquivalent: key))
+        }
+        editItem.submenu = edit; main.addItem(editItem); NSApp.mainMenu = main
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         if let workspaceObserver = workspaceObserver { NSWorkspace.shared.notificationCenter.removeObserver(workspaceObserver) }
     }
@@ -47,9 +64,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func updateIcon() {
-        statusItem?.button?.image = nil
-        statusItem?.button?.title = "Aa"
-        statusItem?.button?.font = .systemFont(ofSize: 13, weight: .medium)
+        statusItem?.button?.image = AppIcon.menuImage()
+        statusItem?.button?.title = engine.pending == nil ? "" : "•"
         statusItem?.button?.alphaValue = preferences.enabled ? 1 : 0.45
         statusItem?.button?.setAccessibilityLabel("AutoCorrect")
         statusItem?.button?.toolTip = "AutoCorrect — \(engine.status)"
@@ -66,8 +82,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func rebuildMenu() {
         menu.removeAllItems()
-        item("AutoCorrect")
+        let heading = item("AutoCorrect")
+        heading.attributedTitle = NSAttributedString(string: "AutoCorrect", attributes: [.font: NSFont.systemFont(ofSize: 14, weight: .semibold)])
         item(engine.status)
+        item("Open AutoCorrect…", action: #selector(showSettings))
         menu.addItem(.separator())
         item("Enable AutoCorrect", action: #selector(toggleEnabled), checked: preferences.enabled)
         item("Ask Before Correcting", action: #selector(toggleApproval), checked: preferences.asksBeforeCorrecting)
@@ -78,7 +96,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             item("Suggestions appear here as you type")
         }
         if let proposal = engine.undoProposal {
-            item("Undo: \(proposal.original) → \(proposal.replacement)", action: #selector(undo))
+            let undoItem = item("Undo: \(proposal.original) → \(proposal.replacement)", action: #selector(undo))
+            undoItem.keyEquivalent = "z"
+            undoItem.keyEquivalentModifierMask = [.control, .option, .command]
             item("Undo & Always Ignore “\(proposal.replacement)”", action: #selector(undoAndIgnore))
         }
         if engine.pending == nil, let word = engine.flaggedWord {
@@ -100,7 +120,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             entry.representedObject = bundle
         }
         if !exclusions.items.isEmpty { item("Paused Apps").submenu = exclusions }
-        item("Settings…", action: #selector(showSettings))
+        let settingsItem = item("Settings…", action: #selector(showSettings))
+        settingsItem.keyEquivalent = ","
+        settingsItem.keyEquivalentModifierMask = [.command]
         menu.addItem(.separator())
         item("Launch at Login", action: #selector(toggleLogin), checked: SMAppService.mainApp.status == .enabled)
         if SMAppService.mainApp.status == .requiresApproval {
@@ -117,7 +139,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         updateIcon()
     }
 
-    @objc private func showSettings() { settings.present() }
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        showSettings()
+        return true
+    }
+
+    @objc private func showSettings() {
+        if settings == nil {
+            let controller = SettingsController(preferences: preferences) { [weak self] in self?.engine.refresh() }
+            controller.builtInReplacements = BuiltInReplacements.expansions.merging(BuiltInReplacements.casing) { _, product in product }
+            controller.preview = { [weak self] in self?.engine.previewText(in: $0) }
+            controller.statusProvider = { [weak self] in
+                guard let self = self else { return "" }
+                return "\(self.engine.status) · \(self.engine.correctionCount) corrections this session"
+            }
+            settings = controller
+        }
+        settings?.present()
+    }
     @objc private func toggleUnderlines() { preferences.showsSpellingIndicators.toggle(); engine.refresh() }
     @objc private func toggleEnabled() { preferences.enabled.toggle(); engine.refresh() }
     @objc private func toggleApproval() { preferences.asksBeforeCorrecting.toggle(); engine.refresh() }

@@ -5,6 +5,7 @@ import AutoCorrectCore
 final class KeyboardMonitor {
     var onKey: ((String?, CGEventFlags, Int64) -> Void)?
     var onMouse: (() -> Void)?
+    var onUndo: (() -> Bool)?
     private var tap: CFMachPort?
     private var source: CFRunLoopSource?
     private struct PendingEdit {
@@ -51,12 +52,15 @@ final class KeyboardMonitor {
                 if let tap = monitor.tap { CGEvent.tapEnable(tap: tap, enable: true) }
             } else if type == .keyDown {
                 monitor.cancelEdit()
+                if event.getIntegerValueField(.keyboardEventKeycode) == 6,
+                   event.flags.intersection([.maskControl, .maskAlternate, .maskCommand, .maskShift]) == [.maskControl, .maskAlternate, .maskCommand],
+                   monitor.onUndo?() == true { return nil }
                 var buffer = [UniChar](repeating: 0, count: 8)
                 var length = 0
                 event.keyboardGetUnicodeString(maxStringLength: buffer.count, actualStringLength: &length, unicodeString: &buffer)
                 let text = length > 0 ? String(utf16CodeUnits: buffer, count: min(length, buffer.count)) : nil
                 monitor.onKey?(text, event.flags, event.getIntegerValueField(.keyboardEventKeycode))
-            } else {
+            } else if type != .flagsChanged {
                 monitor.cancelEdit()
                 monitor.onMouse?()
             }

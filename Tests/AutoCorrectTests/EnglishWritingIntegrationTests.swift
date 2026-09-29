@@ -62,4 +62,33 @@ final class EnglishWritingIntegrationTests: XCTestCase {
         }
     }
 
+    func testBuiltInsAndPhrasePlansUseTheActualEngine() throws {
+        let engine = CorrectionEngine(preferences: preferences)
+        for (source, expected) in ["idk": "I don't know", "iphone": "iPhone", "ui": "UI", "api": "API"] {
+            XCTAssertEqual(engine.suggestion(in: source + " "), expected)
+            let plan = try XCTUnwrap(KeyboardReplacementPlan.make(text: source + " next", wordRange: NSRange(location: 0, length: source.utf16.count), replacement: expected))
+            XCTAssertEqual(plan.expectedText, expected + " next")
+        }
+        XCTAssertEqual(engine.previewText(in: "idk"), "I don't know ")
+        preferences.customCorrections = ["idk": "my own phrase"]
+        XCTAssertEqual(engine.suggestion("idk"), "my own phrase")
+        preferences.ignoredWords = ["idk"]
+        XCTAssertNil(engine.suggestion("idk"))
+        preferences.expandsAbbreviations = false
+        preferences.normalizesProductNames = false
+        XCTAssertNotEqual(engine.suggestion("omw"), "On my way")
+        XCTAssertNotEqual(engine.suggestion("ui"), "UI")
+    }
+
+    func testContextPreviewRequiresApprovalAndRespectsUserChoices() {
+        let engine = CorrectionEngine(preferences: preferences)
+        XCTAssertNil(engine.suggestion(in: "lets go "))
+        XCTAssertEqual(engine.previewText(in: "lets go "), "let's go  (approval required)")
+        XCTAssertEqual(engine.previewText(in: "its a "), "it's a  (approval required)")
+        preferences.ignoredWords = ["lets"]
+        XCTAssertNil(engine.previewText(in: "lets go "))
+        preferences.checksContext = false
+        XCTAssertNil(engine.previewText(in: "its a "))
+    }
+
 }

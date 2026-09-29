@@ -13,7 +13,7 @@ public struct UserDictionary: Equatable, Sendable {
 
     /// Reads one ignored word or `typo -> replacement` pair per line. A Unicode arrow
     /// (`→`) is also accepted. Blank lines are ignored, and errors use one-based lines.
-    /// Replacement spelling and casing are retained exactly after trimming whitespace.
+    /// Replacement phrases and casing are retained exactly after trimming ordinary spaces.
     public static func parse(ignoredText: String, correctionsText: String) throws -> UserDictionary {
         var ignoredWords = Set<String>()
         for (offset, line) in lines(ignoredText).enumerated() {
@@ -29,22 +29,21 @@ public struct UserDictionary: Equatable, Sendable {
         var corrections: [String: String] = [:]
         var firstLines: [String: Int] = [:]
         for (offset, line) in lines(correctionsText).enumerated() {
-            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else { continue }
-            let parts = trimmed.replacingOccurrences(of: "→", with: "->").components(separatedBy: "->")
-            guard parts.count == 2 else {
+            guard !line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
+            let arrows = [line.range(of: "->"), line.range(of: "→")].compactMap { $0 }
+            guard let arrow = arrows.min(by: { $0.lowerBound < $1.lowerBound }) else {
                 throw ValidationError(section: .corrections, line: offset + 1,
                                       reason: "Use one pair in the form typo -> replacement.")
             }
-            let source = parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
-            let replacement = parts[1].trimmingCharacters(in: .whitespacesAndNewlines)
+            let source = String(line[..<arrow.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+            let replacement = String(line[arrow.upperBound...]).trimmingCharacters(in: CharacterSet(charactersIn: " "))
             guard source.lowercased() == "i" || isWord(source, length: 2...32) else {
                 throw ValidationError(section: .corrections, line: offset + 1,
                                       reason: "The typo must be one word of 2–32 letters (or i), with at most one interior apostrophe.")
             }
-            guard isWord(replacement, length: 1...64) else {
+            guard isValidReplacement(replacement) else {
                 throw ValidationError(section: .corrections, line: offset + 1,
-                                      reason: "The replacement must be one word of 1–64 letters, with at most one interior apostrophe.")
+                                      reason: "The replacement must contain 1–120 printable characters, with no tabs, line breaks, or control characters.")
             }
             let key = normalizedKey(source)
             if let firstLine = firstLines[key] {
@@ -55,6 +54,17 @@ public struct UserDictionary: Equatable, Sendable {
             firstLines[key] = offset + 1
         }
         return UserDictionary(ignoredWords: ignoredWords, corrections: corrections)
+    }
+
+    /// Shared validation for saved phrases and insertion plans. Ordinary spaces and printable
+    /// punctuation are allowed; invisible controls, line separators, and empty phrases are not.
+    public static func isValidReplacement(_ replacement: String) -> Bool {
+        guard (1...120).contains(replacement.count),
+              !replacement.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        return replacement.unicodeScalars.allSatisfy {
+            !CharacterSet.controlCharacters.contains($0) && !CharacterSet.newlines.contains($0) &&
+                !CharacterSet.illegalCharacters.contains($0)
+        }
     }
 
     public struct ValidationError: LocalizedError, Equatable, Sendable {
