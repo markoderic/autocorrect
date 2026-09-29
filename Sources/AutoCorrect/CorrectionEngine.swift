@@ -26,7 +26,6 @@ final class CorrectionEngine {
     private var attemptedBoundaries: [UInt64: Int] = [:]
     private var manualRewrites = ManualRewriteProtection()
     private var rewriteField: (pid: pid_t, element: AXUIElement, id: UUID)?
-    private let spellDocument = NSSpellChecker.uniqueSpellDocumentTag()
     #if DEBUG
     var nativeAssessmentObserver: ((String, Bool, String?, [String]) -> Void)?
     #endif
@@ -312,6 +311,11 @@ final class CorrectionEngine {
         let key = preferences.language + ":" + String(preferences.normalizesProductNames) + ":" + String(preferences.separatesJoinedWords) + ":" + text + ":" + String(wordRange.location)
         if let value = cache[key] { return value }
         let checker = NSSpellChecker.shared
+        // A bounded snapshot is not a persistent document. Reusing one tag for every
+        // field lets native correction-response state leak across words and apps.
+        // Our own scoped rewrite protection and user dictionary handle user intent.
+        let spellDocument = NSSpellChecker.uniqueSpellDocumentTag()
+        defer { checker.closeSpellDocument(withTag: spellDocument) }
         let misspelled = checker.checkSpelling(of: word, startingAt: 0, language: preferences.language, wrap: false, inSpellDocumentWithTag: spellDocument, wordCount: nil)
         var answer = Assessment(misspelled: false, replacement: nil, automatic: false)
         let nativeMisspelled = misspelled.location != NSNotFound
@@ -355,8 +359,10 @@ final class CorrectionEngine {
             let preserveCompound = CompoundSpellingPolicy.prefersUnchangedLetters(for: word, guesses: guesses)
             var confident = preserveCompound ? nil : CorrectionPolicy.preferredAutomaticReplacement(for: word, systemCorrection: proposed, guesses: guesses)
             if confident == nil, !preserveCompound, proposed == nil, text != word {
+                let isolatedDocument = NSSpellChecker.uniqueSpellDocumentTag()
                 let isolated = checker.correction(forWordRange: NSRange(location: 0, length: word.utf16.count),
-                    in: word + " ", language: preferences.language, inSpellDocumentWithTag: spellDocument)
+                    in: word + " ", language: preferences.language, inSpellDocumentWithTag: isolatedDocument)
+                checker.closeSpellDocument(withTag: isolatedDocument)
                 confident = CorrectionPolicy.isolatedFallback(for: word, contextualCorrection: proposed,
                     contextualGuesses: guesses, isolatedCorrection: isolated)
             }
