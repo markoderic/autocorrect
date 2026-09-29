@@ -4,9 +4,9 @@ Autocorrect that keeps up with your typing. A small Mac menu bar app that fixes 
 
 ## Download and install
 
-<a href="https://github.com/markoderic/autocorrect/releases/download/v0.3.5/AutoCorrect-0.3.5-universal.zip"><img src="docs/media/download-macos.svg" alt="Download AutoCorrect for macOS" width="296" height="56"></a>
+<a href="https://github.com/markoderic/autocorrect/releases/download/v0.3.6/AutoCorrect-0.3.6-universal.zip"><img src="docs/media/download-macos.svg" alt="Download AutoCorrect for macOS" width="296" height="56"></a>
 
-[Download ZIP](https://github.com/markoderic/autocorrect/releases/download/v0.3.5/AutoCorrect-0.3.5-universal.zip) · **macOS 13 or later** · Apple silicon and Intel · [v0.3.5 preview](https://github.com/markoderic/autocorrect/releases/tag/v0.3.5)
+[Download ZIP](https://github.com/markoderic/autocorrect/releases/download/v0.3.6/AutoCorrect-0.3.6-universal.zip) · **macOS 13 or later** · Apple silicon and Intel · [v0.3.6 preview](https://github.com/markoderic/autocorrect/releases/tag/v0.3.6)
 
 1. **Download** using the button above, then double-click the ZIP to unzip it.
 2. **Drag AutoCorrect.app into Applications**, then open it from there.
@@ -46,13 +46,14 @@ Then open **AutoCorrect** from **Applications** and follow steps 3–4 above. Th
 
 **This is an early release.** App compatibility varies; it cannot correct text in every app or field. See [validation and known limits](docs/VALIDATION.md).
 
-## What changed in 0.3.5
+## What changed in 0.3.6
 
-- **Capitalize after . ? !:** the next completed word is capitalized after questions and exclamations too, including `?!`, quotes, and brackets. `Really? hello ` becomes `Really? Hello `. The existing capitalization toggle now covers all three endings.
-- **More automatic corrections:** native automatic recommendations that also rank first can repair two edits in 5+ letter words, including `finnaly → finally`, `probly → probably`, `beutifl → beautiful`, and `buisnes → business`. A strictly closer alternative still blocks this broader fallback.
-- **Automatic mode stays automatic:** uncertain words get a spelling indication without an approval action. Only turning on **Ask Before Correcting** creates approval requests. Ignored words, custom rules, manual rewrites, compound/name protection, and undo retain their existing behavior.
+- **Missing doubled consonants:** `kiding → kidding` now wins over unrelated native guesses such as “riding.” The same bounded rule covers missing or extra doubled consonants across ordinary words, including `runing`, `begining`, `swiming`, `shoping`, `acident`, and `adress`. It uses dictionary candidates rather than a fixed replacement for each typo.
+- **Damaged invitations:** `leets see → let's see`, including capitalized sentence starts. `leets` is accepted by the native dictionary, so this repair uses the following invitation verb. Isolated `leets` and valid uses of `lets` are preserved.
+- **Missing native recommendations:** a strong ranked suggestion can still apply when macOS omits its separate automatic recommendation. Matching ends, candidate uniqueness or preserved-letter insertions, and distance checks constrain this fallback.
+- **Regression coverage:** full typing previews cover both reported sentences, fifteen repeated-consonant examples, valid-word counterexamples, user overrides, following-text preservation, and undo. Tests establish these behaviors, not a universal spelling-accuracy percentage.
 
-Missing-space repairs, smart-apostrophe editing, and partial Accessibility geometry support from 0.3.4 remain included. [Test evidence](docs/VALIDATION.md) · [Underline limitations](docs/SPACING-AND-UNDERLINES.md).
+Automatic mode, sentence capitalization after `. ? !`, missing-space repairs, and manual-rewrite protection remain included. [Test evidence](docs/VALIDATION.md) · [Underline limitations](docs/SPACING-AND-UNDERLINES.md).
 
 ## See it in action
 
@@ -106,8 +107,8 @@ The build script compiles **arm64 and x86_64**, combines them into a universal e
 
 ```text
 dist/AutoCorrect.app
-dist/AutoCorrect-0.3.5-universal.zip
-dist/AutoCorrect-0.3.5-universal.zip.sha256
+dist/AutoCorrect-0.3.6-universal.zip
+dist/AutoCorrect-0.3.6-universal.zip.sha256
 ```
 
 It can be called from any working directory. The installer uses `/Applications` when writable, otherwise `~/Applications`. Use `--user` to choose `~/Applications`, `--no-open` to install without launching, and `--replace` to replace an existing installation. Quit AutoCorrect before replacing it; the installer preserves the previous bundle alongside the new one.

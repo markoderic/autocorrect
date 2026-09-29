@@ -1,3 +1,17 @@
+# 0.3.6 validation
+
+Checked September 29, 2026 on the development Mac.
+
+- **143 automated tests passed, 0 failures locally.** New engine fixtures exercise both reported sentences, fifteen missing/extra consonant examples, valid-word/name/structured-token counterexamples, context toggles, ignored/custom replacements, following-text preservation, and reversal. Core fixtures cover doubled-consonant ranking, ambiguous candidate refusal, two missing doubles, capitalization, invitation variants, and absent native automatic recommendations.
+- Native probes reproduced the mismatch: `kiding` was misspelled but macOS preferred `riding` and ranked `kidding` fourth; `leets` was accepted as a valid word. The new rule considers the first eight dictionary suggestions, requires one unique repeated-consonant repair with at most two insertions/deletions, and preserves the source's letters. It runs only for detected misspellings after existing user/name protection. It does not globally rewrite valid `siting`, `planing`, `hoping`, or `riding`.
+- `leets see if this is right ` becomes `let's see if this is right ` in the completed-key preview. This waits for an invitation verb, supports the existing capitalization behavior, and preserves isolated/ambiguous `leets`. It is a bounded context rule, not full semantic grammar.
+- A macOS 14 CI failure supplied decisive native evidence for an earlier intermittent miss: `buisnes` was detected as misspelled with guesses `[business]` but an automatic recommendation of nil. The new deterministic fallback tests that exact case. Without a native recommendation, a two-edit first guess requires at least six source letters, matching ends, no closer competitor, and either a sole top-five candidate or an insertion-only repair preserving typed letters. This fixes that identified path; it does not prove every historical intermittent failure has the same cause.
+- Universal arm64/x86_64 build and exact-archive signature, architecture, and bundled-license verification passed. ZIP: 1,612,062 bytes; SHA-256: `233990c4c3057a7257c59955e850507dd296b1e972fd78c3fc2257d86a4a5a73`. Public build remains ad-hoc signed and not notarized.
+- Hosted macOS 14 run [36536980882](https://github.com/markoderic/autocorrect/actions/runs/36536980882) passed the full test suite and universal build after the missing-recommendation fallback. Installed 0.3.6 with the existing development signing identity; versioned diagnostics and the running process confirm startup, Accessibility, Input Monitoring, keyboard listener, supported layout, and launch-at-login registration. Installed fixed probes confirm both reported sentences and the new word families.
+- No physical-keyboard, all-app underline, or long-duration power validation is claimed. These are engine/policy/queue/edit-plan fixtures. 1.0 still requires a real typing compatibility matrix and release-quality distribution; a higher version number would not establish those properties.
+
+---
+
 # 0.3.5 validation
 
 Checked September 29, 2026 on the development Mac.
