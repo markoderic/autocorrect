@@ -1,3 +1,18 @@
+# 0.3.3 validation
+
+Checked September 29, 2026 on the development Mac.
+
+- **124 automated tests passed, 0 failures.** New tests exercise the actual native checker for ten damaged contraction spellings, nineteen product/company/format spellings, nine name typos, thirteen larger ordinary-word typos, ordinary-word counterexamples, technical recognition, ignored/custom-word precedence, and full filename/URL typing. Deterministic policy tests cover native-candidate ambiguity, language/case gates, period/colon deferral, and strict three-edit fallback requirements. Existing context, undo, manual rewrite, and event-construction tests remain in the suite.
+- Examples passing through the actual correction engine include `doenst / dosent / dosen't → doesn't`, `woudlnt → wouldn't`, `didtn → didn't`, `powerpoint / powerpiont → PowerPoint`, `microsfot → Microsoft`, `figmaa → Figma`, `kubernets → Kubernetes`, and `pdf → PDF`. Correct ordinary words such as `apple`, `word`, `excel`, `slack`, and `docent` stay unchanged.
+- 6,231 recognition terms and 2,234 canonical name entries were generated from pinned CSpell company/software/filetype data. These include components of multiword names; the counts are not distinct-company totals or accuracy percentages. The [source manifest](lexicon-sources.json), generator, and MIT attribution are included. The exact public app archive contains `THIRD_PARTY_NOTICES.md`.
+- The new name lookup microbenchmark, compiled with `swiftc -O`, measured 12.480 ms for first lookup including lazy index creation and 0.0041 ms mean over 3,000 warm synthetic lookups. This excludes native spell checking, event transport, and app UI; it is not an end-to-end typing/battery benchmark.
+- Periods and colons now defer word assessment until another delimiter. Full typing previews preserve `doenst.txt`, `powerpoint.pptx`, `iphoen.png`, email/URL/path tokens, and underscores. A plain sentence ending `it doenst. ` becomes `it doesn't. ` after its trailing space. Ordinary words separated by spaces inside a filename cannot always be distinguished from prose; no filesystem scan is performed.
+- Universal arm64/x86_64 compilation, exact-archive checksum, strict ad-hoc signature, and bundled license checks passed. Archive size: 1,590,346 bytes. SHA-256: `84ff5beea5ef2ae1963cca619954919573f15ced6ab31705a7f081efd3b4051d`. This remains a preview, not Apple notarized.
+- Installed 0.3.3 using the existing development identity. Diagnostics confirm Accessibility, Input Monitoring, keyboard listener, supported layout, and enabled launch-at-login registration; fixed installed-engine probes confirm the new examples.
+- No new physical-keyboard app compatibility pass is claimed. The new tests establish dictionary/engine/queue behavior; real typing in each host app, foreground races, and long-duration power measurements remain separate validation work. Arbitrary semantic substitutions and all company/person names are not guaranteed.
+
+---
+
 # 0.3.2 validation
 
 Checked September 29, 2026 on the development Mac.

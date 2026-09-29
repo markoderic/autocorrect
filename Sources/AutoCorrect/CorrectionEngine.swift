@@ -251,9 +251,12 @@ final class CorrectionEngine {
         let completed = text.last.map(CorrectionPolicy.isDelimiter) == true ? text : text + " "
         guard completed.utf16.count <= 256 else { return nil }
         var output = ""
+        var previewBoundaries = CompletedWordBacklog()
         for character in completed {
             output.append(character)
-            if CorrectionPolicy.isDelimiter(character) {
+            previewBoundaries.append(String(character))
+            if let boundary = previewBoundaries.boundaries.last {
+                previewBoundaries.remove(boundary.id)
                 if let candidate = candidate(in: output), let replacement = suggestion(in: output) {
                     output = (output as NSString).replacingCharacters(in: candidate.range, with: replacement)
                 }
@@ -262,7 +265,7 @@ final class CorrectionEngine {
                 }
             }
         }
-        if let context = contextualCandidate(in: output) {
+        if output.last != ".", output.last != ":", let context = contextualCandidate(in: output) {
             return (output as NSString).replacingCharacters(in: context.range, with: context.replacement) + " (approval required)"
         }
         return output == completed ? nil : output
@@ -286,7 +289,7 @@ final class CorrectionEngine {
         let spelling = spellingAssessment(word, context: context, range: range)
         // Product spelling is canonical even at a sentence start (iPhone, not IPhone).
         if preferences.normalizesProductNames, let replacement = spelling.replacement,
-           BuiltInReplacements.casing.values.contains(replacement) { return spelling }
+           NameLexicon.isCanonicalName(replacement) { return spelling }
         guard preferences.capitalizesAfterPeriod, let context, let range,
               let sentence = SentenceCapitalization.candidate(in: context, caret: context.utf16.count), sentence.range == range,
               let chosen = spelling.replacement ?? (spelling.misspelled ? nil : word),
@@ -305,12 +308,25 @@ final class CorrectionEngine {
         let checker = NSSpellChecker.shared
         let misspelled = checker.checkSpelling(of: word, startingAt: 0, language: preferences.language, wrap: false, inSpellDocumentWithTag: spellDocument, wordCount: nil)
         var answer = Assessment(misspelled: false, replacement: nil, automatic: false)
-        if misspelled.location != NSNotFound {
-            if preferences.normalizesProductNames, let product = BuiltInReplacements.productTypoReplacement(for: word) {
-                return Assessment(misspelled: true, replacement: product, automatic: true)
-            }
+        let nativeMisspelled = misspelled.location != NSNotFound
+        if preferences.normalizesProductNames,
+           let canonical = NameLexicon.canonicalReplacement(for: word, nativeMisspelled: nativeMisspelled) {
+            return Assessment(misspelled: true, replacement: canonical, automatic: true)
+        }
+        // Recognition is independent of automatic capitalization: technical names should
+        // not become unrelated English words even with product casing switched off.
+        if NameLexicon.recognizes(word) { return answer }
+        if nativeMisspelled {
             let proposed = checker.correction(forWordRange: wordRange, in: text, language: preferences.language, inSpellDocumentWithTag: spellDocument)
             let guesses = checker.guesses(forWordRange: wordRange, in: text, language: preferences.language, inSpellDocumentWithTag: spellDocument) ?? []
+            if let contraction = EnglishWritingRules.typoReplacement(for: word, language: preferences.language,
+                                                                     systemCorrection: proposed, guesses: guesses) {
+                return Assessment(misspelled: true, replacement: contraction, automatic: true)
+            }
+            if preferences.normalizesProductNames,
+               let product = NameLexicon.typoReplacement(for: word, systemCorrection: proposed, guesses: guesses) {
+                return Assessment(misspelled: true, replacement: product, automatic: true)
+            }
             let preserveCompound = CompoundSpellingPolicy.prefersUnchangedLetters(for: word, guesses: guesses)
             let confident = preserveCompound ? nil : CorrectionPolicy.preferredAutomaticReplacement(for: word, systemCorrection: proposed, guesses: guesses)
             // Dictionary guesses can cover larger mistakes, but never apply them without approval.

@@ -16,6 +16,31 @@ public enum EnglishWritingRules {
         "whats": "what's", "whos": "who's", "heres": "here's"
     ]
 
+    /// Correct a damaged contraction as one operation: a missing apostrophe plus
+    /// a transposition/omission is often rejected by a generic one-edit word gate.
+    /// Native misspelling detection must precede this; valid words never enter here.
+    public static func typoReplacement(for original: String, language: String,
+                                       systemCorrection: String?, guesses: [String]) -> String? {
+        guard language.replacingOccurrences(of: "-", with: "_").split(separator: "_").first?.lowercased() == "en",
+              (5...16).contains(original.count), !original.dropFirst().contains(where: \.isUppercase),
+              original.allSatisfy({ ($0.asciiValue != nil && $0.isLetter) || $0 == "'" || $0 == "’" }) else { return nil }
+        let source = original.lowercased().replacingOccurrences(of: "'", with: "").replacingOccurrences(of: "’", with: "")
+        let candidates = contractions.filter { key, _ in
+            key.count >= 5 && CorrectionPolicy.editDistance(Array(source), Array(key)) == 1
+        }
+        guard candidates.count == 1, let (key, replacement) = candidates.first,
+              source.prefix(2) == key.prefix(2) else { return nil }
+        let native = ([systemCorrection].compactMap { $0 } + Array(guesses.prefix(3))).map {
+            $0.lowercased().replacingOccurrences(of: "’", with: "'")
+        }
+        // Native agreement also permits a missing/extra letter. Without it, only a
+        // unique adjacent transposition preserving every letter is eligible.
+        let preservesLetters = source.count == key.count && source.sorted() == key.sorted()
+        guard native.contains(replacement.lowercased()) || preservesLetters else { return nil }
+        return original.first?.isUppercase == true
+            ? replacement.prefix(1).uppercased() + replacement.dropFirst() : replacement
+    }
+
     public static func replacement(for original: String, language: String) -> String? {
         guard language.replacingOccurrences(of: "-", with: "_").split(separator: "_").first?.lowercased() == "en",
               !original.dropFirst().contains(where: { $0.isUppercase }) else { return nil }

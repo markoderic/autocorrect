@@ -13,7 +13,7 @@ final class CompletedWordBacklogTests: XCTestCase {
     }
     func testRepeatedSeparatorsDoNotRevisitAnUndoneWord() {
         var queue = CompletedWordBacklog()
-        for character in "teh." { queue.append(String(character)) }
+        for character in "teh. " { queue.append(String(character)) }
         queue.remove(queue.boundaries[0].id)
         for character in "  " { queue.append(String(character)) }
         XCTAssertTrue(queue.boundaries.isEmpty)

@@ -178,7 +178,8 @@ final class SettingsController: NSWindowController, NSTableViewDataSource, NSTab
     private func replacements(_ body: NSStackView) {
         body.addArrangedSubview(card([
             toggle("Expand common abbreviations", value: preferences.expandsAbbreviations, action: #selector(setAbbreviations(_:))),
-            toggle("Capitalize product names and acronyms", value: preferences.normalizesProductNames, action: #selector(setProducts(_:)))
+            toggle("Capitalize product names and acronyms", value: preferences.normalizesProductNames, action: #selector(setProducts(_:))),
+            label("Includes company, software, and file-format names. Ordinary words and complete filenames are preserved.", size: 12, secondary: true)
         ]))
         let filter = NSSegmentedControl(labels: ["My replacements", "Built-in + mine"], trackingMode: .selectOne, target: self, action: #selector(filterRules(_:)))
         filter.selectedSegment = filterBuiltins ? 1 : 0

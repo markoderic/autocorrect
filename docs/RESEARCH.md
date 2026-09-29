@@ -52,3 +52,8 @@ Native probes also corrected `screensht`, `screnshot`, `screeshot`, and `screesn
 `har` is accepted by the tested native English dictionary and has many different guesses. No static `har → that` rule was added: changing valid words from sentence meaning needs broader disambiguation, not just edit distance. This release does not add a cloud service or language model, nor claim semantic accuracy equal to Grammarly.
 
 Context checks now use each queued completed prefix rather than only the latest full snapshot. Successful edits retain their boundary until a fresh snapshot can evaluate both ordinary spelling and context. Failed verification still clears the queue and never repeats the deletion.
+
+
+## 0.3.3 names, contractions, and structured tokens
+
+See [Names and accuracy research](NAMES-AND-ACCURACY.md) for the source comparison, pinned dictionary provenance, correction gates, filename/URL behavior, and limits. The app now bundles filtered word data; it still does not download a dictionary at runtime or run a third-party correction service. Period/colon boundaries wait for a subsequent delimiter to avoid editing an incomplete filename or URL.

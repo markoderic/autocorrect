@@ -11,19 +11,20 @@ public enum BuiltInReplacements {
     public static let casing: [String: String] = [
         "iphone": "iPhone", "ipad": "iPad", "macbook": "MacBook", "airpods": "AirPods",
         "github": "GitHub", "chatgpt": "ChatGPT", "linkedin": "LinkedIn", "youtube": "YouTube",
+        "powerpoint": "PowerPoint", "photoshop": "Photoshop", "onenote": "OneNote", "onedrive": "OneDrive",
+        "sharepoint": "SharePoint", "libreoffice": "LibreOffice", "openoffice": "OpenOffice",
+        "javascript": "JavaScript", "typescript": "TypeScript", "wordpress": "WordPress", "woocommerce": "WooCommerce",
+        "salesforce": "Salesforce", "quickbooks": "QuickBooks", "autocad": "AutoCAD", "solidworks": "SolidWorks",
+        "davinci": "DaVinci", "tiktok": "TikTok", "whatsapp": "WhatsApp", "snapchat": "Snapchat",
+        "instagram": "Instagram", "facebook": "Facebook", "reddit": "Reddit", "spotify": "Spotify",
+        "netflix": "Netflix", "gmail": "Gmail", "icloud": "iCloud", "imessage": "iMessage", "facetime": "FaceTime",
+        "ipados": "iPadOS", "watchos": "watchOS", "airdrop": "AirDrop", "airplay": "AirPlay", "airtag": "AirTag",
+        "testflight": "TestFlight", "xcode": "Xcode",
+        "pdf": "PDF", "png": "PNG", "jpeg": "JPEG", "jpg": "JPG", "gif": "GIF", "svg": "SVG",
+        "csv": "CSV", "json": "JSON", "html": "HTML", "css": "CSS", "xml": "XML", "sql": "SQL",
+        "http": "HTTP", "https": "HTTPS", "url": "URL", "usb": "USB",
         "ui": "UI", "ux": "UX", "api": "API", "macos": "macOS"
     ]
-
-    /// Call only after the dictionary marks the source as misspelled. A unique one-edit
-    /// match to a longer product name is safe to recase; never fuzzy-match short acronyms.
-    public static func productTypoReplacement(for original: String) -> String? {
-        guard (4...32).contains(original.count), original.allSatisfy({ $0.asciiValue != nil && $0.isLetter }),
-              !original.dropFirst().contains(where: { $0.isUppercase }) else { return nil }
-        let matches = casing.filter { key, _ in
-            key.count >= 5 && CorrectionPolicy.editDistance(Array(original.lowercased()), Array(key)) == 1
-        }
-        return matches.count == 1 ? matches.first?.value : nil
-    }
 
     /// English abbreviations are language-gated. Product/acronym casing is language-neutral.
     /// ALLCAPS, Initialcase, and mixed-case input are preserved as deliberate user choices.

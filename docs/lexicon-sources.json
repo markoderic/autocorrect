@@ -1,0 +1,40 @@
+{
+  "repository": "https://github.com/streetsidesoftware/cspell-dicts",
+  "revision": "152f3ba420772105156cd0ead94a47f9ed493a8d",
+  "sources": {
+    "companies/src/companies.txt": {
+      "sha256": "44ac45eee5b9478536cb08e29c2c1008cc0fb10095ef4ad9f6ec7a8de65a545d",
+      "bytes": 39740
+    },
+    "software-terms/src/software-tools.txt": {
+      "sha256": "494e1dd6d7d5111b45a2fa47ed87c9a94817bcae873e1dce101d1e8995f050f7",
+      "bytes": 6236
+    },
+    "software-terms/src/software-services.txt": {
+      "sha256": "4125c5bd54e9435111dcb3d9c4f00b2998f391ea6421aac057287e5d23c6ff1f",
+      "bytes": 363
+    },
+    "software-terms/src/network-os.txt": {
+      "sha256": "75749b9e90aea3ffaaa51535ad4f3d9b96610f68577cc5ef612a388687ceb9c9",
+      "bytes": 122
+    },
+    "software-terms/src/software-terms.txt": {
+      "sha256": "0f51a1e0643f2983634952da8060c864d04a37de9b4dab6230fa0f4971e2b3ca",
+      "bytes": 22593
+    },
+    "software-terms/src/coding-terms.txt": {
+      "sha256": "acb533f718cc7c38832c5ddc232d46161a4553b39fc2ba9b63e5bda93976c9b2",
+      "bytes": 13885
+    },
+    "software-terms/src/computing-acronyms.txt": {
+      "sha256": "5ad1c671d8f9212b6f5c1c169f19f21e480c98b34a763f9f6ed0995ad6d63ff3",
+      "bytes": 1380
+    },
+    "filetypes/src/filetypes.txt": {
+      "sha256": "9714cb1357d0ff02d5e3f571bc9a3381cbfbee98ef24494cf27d533dec27e2ea",
+      "bytes": 2320
+    }
+  },
+  "canonicalNameCount": 2234,
+  "recognizedTermCount": 6231
+}

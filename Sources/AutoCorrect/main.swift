@@ -14,13 +14,13 @@ if CommandLine.arguments.contains("--diagnostics") {
 } else if CommandLine.arguments.contains("--check-spelling") {
     let preferences = Preferences()
     let engine = CorrectionEngine(preferences: preferences)
-    for word in ["i", "im", "i'm", "ive", "doesnt", "dont", "didnt", "cant", "wont", "youre", "ti", "teh", "ths", "mispell", "ill", "well", "were", "its", "world", "Marko", "GitHub", "idk", "omw", "iphone", "ui", "api", "capitazed", "inconvient", "acomodation", "probblity", "homebrew", "github", "iphoen", "iphne", "githbu", "screensht", "screnshot", "screeshot", "screenshot", "har"] {
+    for word in ["i", "im", "i'm", "ive", "doesnt", "dont", "didnt", "cant", "wont", "youre", "ti", "teh", "ths", "mispell", "ill", "well", "were", "its", "world", "Marko", "GitHub", "idk", "omw", "iphone", "ui", "api", "capitazed", "inconvient", "acomodation", "probblity", "homebrew", "github", "iphoen", "iphne", "githbu", "screensht", "screnshot", "screeshot", "screenshot", "har", "doenst", "dosent", "dosen't", "woudlnt", "didtn", "powerpoint", "powerpiont", "microsoft", "microsfot", "figma", "figmaa", "kubernets", "pdf"] {
         print("\(word) → \(engine.suggestion(word) ?? "(unchanged)")")
     }
     for text in ["Done. hello ", "Done. a ", "Done. teh ", "Dr. smith "] {
         print("\(text)→ \(engine.suggestion(in: text) ?? "(unchanged)")")
     }
-    for text in ["lets improve this ", "okay, lets fix this ", "its a screenshot ", "its ready.", "its good looks ", "its screen is broken ", "she lets go "] {
+    for text in ["lets improve this ", "okay, lets fix this ", "its a screenshot ", "its ready. ", "its good looks ", "its screen is broken ", "she lets go "] {
         print("\(text)→ \(engine.previewText(in: text) ?? "(unchanged)")")
     }
 } else {

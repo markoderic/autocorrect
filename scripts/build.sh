@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
-VERSION="${VERSION:-0.3.2}"
+VERSION="${VERSION:-0.3.3}"
 SIGNING_IDENTITY="${SIGNING_IDENTITY:--}"
 APP="$ROOT/dist/AutoCorrect.app"
 
@@ -15,7 +15,7 @@ for command in swift xcrun codesign ditto; do
   command -v "$command" >/dev/null || { echo "error: missing $command. Install Xcode Command Line Tools." >&2; exit 1; }
 done
 [[ -f Package.swift ]] || { echo "error: Package.swift is missing from $ROOT." >&2; exit 1; }
-[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "error: VERSION must have the form 0.3.2." >&2; exit 1; }
+[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "error: VERSION must have the form 0.3.3." >&2; exit 1; }
 
 mkdir -p "$ROOT/dist"
 STAGING="$(mktemp -d "${TMPDIR:-/tmp}/autocorrect-build.XXXXXX")"
@@ -35,6 +35,7 @@ mkdir -p "$BUNDLE/Contents/MacOS" "$BUNDLE/Contents/Resources"
 xcrun lipo -create "$STAGING/AutoCorrect-arm64" "$STAGING/AutoCorrect-x86_64" -output "$BUNDLE/Contents/MacOS/AutoCorrect"
 xcrun strip -x "$BUNDLE/Contents/MacOS/AutoCorrect"
 cp Resources/Info.plist "$BUNDLE/Contents/Info.plist"
+cp THIRD_PARTY_NOTICES.md "$BUNDLE/Contents/Resources/THIRD_PARTY_NOTICES.md"
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$BUNDLE/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" "$BUNDLE/Contents/Info.plist"
 if [[ -f Resources/AppIcon.icns ]]; then

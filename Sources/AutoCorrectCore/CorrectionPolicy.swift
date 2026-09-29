@@ -85,7 +85,9 @@ public enum CorrectionPolicy {
     /// Beyond that gate, its first ranked guess can qualify: one edit for 5+ letters, or
     /// two for 8+ letters with matching ends. A native two-edit automatic recommendation
     /// may also qualify within the first three guesses when it is uniquely closest.
-    /// Another top-five guess at equal or closer distance blocks this fallback. These are
+    /// Three edits require 12+ letters, matching ends, and agreement between the native
+    /// recommendation and first guess. Another top-five guess at equal or closer
+    /// distance blocks these ranked fallbacks. These are
     /// safety heuristics, not calibrated probabilities or proof of the writer's intent.
     public static func preferredAutomaticReplacement(for original: String, systemCorrection: String?, guesses: [String]) -> String? {
         guard isPlainWord(original), hasSafeCase(original) else { return nil }
@@ -137,10 +139,16 @@ public enum CorrectionPolicy {
         let targetKey = UserDictionary.normalizedKey(selected)
         let target = Array(targetKey)
         let distance = editDistance(source, target)
-        guard distance > 0, distance <= 2 else { return nil }
+        guard distance > 0, distance <= 3 else { return nil }
         if distance == 2 {
             guard source.count >= 8, target.count >= 8, source.first == target.first, source.last == target.last,
                   distance * 4 <= source.count else { return nil }
+        }
+        if distance == 3 {
+            guard source.count >= 12, target.count >= 12,
+                  source.first == target.first, source.last == target.last,
+                  guesses.first.map({ UserDictionary.normalizedKey($0) }) == targetKey,
+                  systemCorrection.map({ UserDictionary.normalizedKey($0) }) == targetKey else { return nil }
         }
         // Native rank alone is not a confidence score. Demand a full edit of separation
         // from every other top-five guess and any different automatic recommendation.

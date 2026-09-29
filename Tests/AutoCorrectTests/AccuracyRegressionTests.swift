@@ -52,8 +52,8 @@ final class AccuracyRegressionTests: XCTestCase {
         for (source, expected) in [
             "lets improve it ": "let's improve it ", "okay, lets fix this ": "okay, let's fix this ",
             "lets not go ": "let's not go ", "its a screenshot ": "it's a screenshot ",
-            "its ready.": "it's ready.", "its working now ": "it's working now ",
-            "its really good.": "it's really good.", "I think its going to work ": "I think it's going to work ",
+            "its ready. ": "it's ready. ", "its working now ": "it's working now ",
+            "its really good. ": "it's really good. ", "I think its going to work ": "I think it's going to work ",
             "it's screen is broken ": "its screen is broken ", "its a screensht ": "it's a screenshot "
         ] {
             XCTAssertEqual(engine.previewText(in: source), expected, source)

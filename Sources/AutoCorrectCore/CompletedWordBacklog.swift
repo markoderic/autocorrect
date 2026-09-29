@@ -19,12 +19,14 @@ public struct CompletedWordBacklog {
     }
     public private(set) var boundaries: [Boundary] = []
     private var previousWasDelimiter = true
+    private var pendingAmbiguousPunctuation = false
     private var nextID: UInt64 = 0
     public init() {}
 
     public mutating func reset() {
         boundaries.removeAll(keepingCapacity: true)
         previousWasDelimiter = true
+        pendingAmbiguousPunctuation = false
     }
 
     /// Navigation, deletion, paste, modifiers, focus, and mouse changes must reset
@@ -35,11 +37,14 @@ public struct CompletedWordBacklog {
         for index in boundaries.indices { boundaries[index].trailingUTF16 += 1 }
         boundaries.removeAll { $0.trailingUTF16 > 96 }
         let delimiter = CorrectionPolicy.isDelimiter(character)
-        if delimiter && !previousWasDelimiter {
+        // A period or colon can begin a filename extension, URL, or decimal. Wait for another
+        // delimiter before touching the token; "doenst.txt" must never become "doesn't.txt".
+        if delimiter && !".:".contains(character) && (!previousWasDelimiter || pendingAmbiguousPunctuation) {
             nextID &+= 1
             boundaries.append(Boundary(id: nextID, trailingUTF16: 0, delimiter: character))
             if boundaries.count > 8 { boundaries.removeFirst(boundaries.count - 8) }
         }
+        pendingAmbiguousPunctuation = ".:".contains(character)
         previousWasDelimiter = delimiter
     }
 
