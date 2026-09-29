@@ -16,7 +16,7 @@ public enum CorrectionPolicy {
     /// Only ordinary spaces and sentence punctuation trigger a correction. Return and Tab
     /// deliberately do not: they can send a message, submit a form, or move focus.
     public static func isDelimiter(_ character: Character) -> Bool {
-        " .,!?;:)]}\"”».".contains(character)
+        TypingTypography.isSpace(character) || ".,!?;:)]}\"”»".contains(character)
     }
 
     /// Finds a complete word just before `caret`, expressed as a UTF-16 offset in `text`.
@@ -35,7 +35,7 @@ public enum CorrectionPolicy {
         // A repeated space must not revisit a word the user already accepted or reverted.
         var end = prefix.index(before: prefix.endIndex)
         guard end > prefix.startIndex else { return nil }
-        if last == " ", prefix[prefix.index(before: end)] == " " { return nil }
+        if TypingTypography.isSpace(last), TypingTypography.isSpace(prefix[prefix.index(before: end)]) { return nil }
 
         // Permit sentence punctuation followed by a space, but never cross whitespace.
         while end > prefix.startIndex, isClosingPunctuation(prefix[prefix.index(before: end)]) {
@@ -59,6 +59,15 @@ public enum CorrectionPolicy {
         // remain part of the token and are rejected below as likely structured text.
         while start < end, "([\"“«{".contains(prefix[start]) {
             start = prefix.index(after: start)
+        }
+        // Single quotes double as apostrophes. Only trim a trailing quote when
+        // there is a matching opener; never turn an unpaired possessive into a word.
+        if start < end, prefix[start] == "'" || prefix[start] == "‘" {
+            let closing: Character = prefix[start] == "‘" ? "’" : "'"
+            start = prefix.index(after: start)
+            if start < end, prefix[prefix.index(before: end)] == closing {
+                end = prefix.index(before: end)
+            }
         }
         guard start < end else { return nil }
         let word = String(prefix[start..<end])

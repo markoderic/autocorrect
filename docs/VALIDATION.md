@@ -1,3 +1,28 @@
+# 0.3.7 validation
+
+Checked September 29, 2026 on the development Mac.
+
+- **150 automated tests passed, 0 failures locally.** The added corpus has 78 hand-labeled everyday misspellings in three contexts (234 assertions), including `speoll → spell`. It reproduced an unwanted `buisness → Business` change, now corrected to ordinary prose casing. These are regression fixtures, not a held-out accuracy percentage or proof of sentence understanding.
+- Before the fixes, quoted words and nonbreaking-space boundaries failed six new engine assertions. Tests now cover straight/curly single quotes, curly double quotes, native space substitutions, exact suffix preservation and reversal, custom/ignored words, filenames, possessive apostrophes, and rejected combining/control characters. Existing product-name tests still pass.
+- Rich-text Accessibility can now fall back to `AXAttributedStringForRange`, using the same bounded range and actual caret. Tests reject wrong-length, oversized and wrong-type responses. This adds a standards-based read path, not proof that every rich-text editor implements it.
+- Universal arm64/x86_64 archive extraction, signature verification, both architecture checks, and cask syntax passed. ZIP: 1,617,711 bytes; SHA-256: `23b055f0b236b1ccdf85aad0aa98571ca13c451c56a9dd5ec67b1c50410b0422`. Public preview is ad-hoc signed and **not notarized**. The local install keeps the existing Apple Development identity. Installed 0.3.7 diagnostics report Accessibility, Input Monitoring, keyboard-listener availability, supported layout, and enabled login service.
+- Stable release preparation refuses missing Developer ID/notary configuration. The notarization script rejects the current ad-hoc signature before submission. Shell syntax checks passed. The successful Apple submission/stapling path is **unverified and blocked** on a Developer ID Application certificate plus notarization credentials. No warning-free download is claimed. See [notarization setup](NOTARIZATION.md).
+- A native UI automation attempt in a new disposable TextEdit document entered `speoll ` and `teh next`, but no correction was observed. Opt-in phase diagnostics showed no snapshot/edit activity for those automated keystrokes. This attempt does not establish whether physical keystrokes reach the same path. The app is back in normal, non-tracing operation. **Real-keyboard end-to-end checks remain unverified for this version.**
+- One idle process sample showed 0.0% CPU and about 61 MiB resident memory. This is only an instantaneous observation, not a battery/idle/active benchmark.
+
+## Remaining 1.0 acceptance gates
+
+| Gate | Evidence required | Current status |
+| --- | --- | --- |
+| Download and first launch | Developer ID, accepted notarization, stapled ticket, Gatekeeper-approved quarantined download on another Mac | Blocked on signing setup |
+| Everyday accuracy | Larger independently labeled typo and valid-word corpus; measured false corrections as well as missed corrections | Regression coverage expanded; independent benchmark pending |
+| Real typing | Native TextEdit/Notes/Mail, ChatGPT, Claude, Chrome/Safari standard and rich fields; space/punctuation, fast typing, focus changes, no lost following text | Physical-keyboard matrix pending |
+| Undo and deliberate rewrites | Revert after continued typing, repeated edits, field switches, user overrides in each supported editor | Policy/edit-plan tests pass; cross-app physical checks pending |
+| Resource use | Sustained idle/typing CPU, memory and wakeups on Apple silicon and Intel | Instantaneous local sample only |
+| Unsupported fields | Explicitly preserve passwords, IME composition, protected/custom editors, code and structured text | Existing exclusions and guards retained; universal support is not promised |
+
+---
+
 # 0.3.6 validation
 
 Checked September 29, 2026 on the development Mac.

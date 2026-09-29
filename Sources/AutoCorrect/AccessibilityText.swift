@@ -76,6 +76,11 @@ enum AccessibilityText {
         var output: CFTypeRef?
         if AXUIElementCopyParameterizedAttributeValue(element, kAXStringForRangeParameterizedAttribute as CFString, boxed, &output) == .success,
            let string = output as? String, (string as NSString).length == range.length { return string }
+        // Some rich editors expose only the attributed range API. Read the same
+        // bounded range; never infer a caret or fetch an entire document to find it.
+        output = nil
+        if AXUIElementCopyParameterizedAttributeValue(element, kAXAttributedStringForRangeParameterizedAttribute as CFString, boxed, &output) == .success,
+           let string = attributedSubstring(output, expectedLength: range.length) { return string }
         // Rich contenteditable controls can expose AXValue without NumberOfCharacters.
         // A known oversize value is skipped before fetching it; unknown sizes are checked
         // immediately after the one fallback read. Never infer a caret from the value.
@@ -83,6 +88,12 @@ enum AccessibilityText {
         if let count, !(0...16_384).contains(count) { return nil }
         guard let value = attribute(element, kAXValueAttribute) as? String else { return nil }
         return boundedSubstring(value, reportedCount: count, range: range)
+    }
+
+    static func attributedSubstring(_ value: Any?, expectedLength: Int) -> String? {
+        guard (0...512).contains(expectedLength), let attributed = value as? NSAttributedString,
+              attributed.length == expectedLength else { return nil }
+        return attributed.string
     }
 
     static func boundedSubstring(_ value: String, reportedCount: Int?, range: CFRange) -> String? {

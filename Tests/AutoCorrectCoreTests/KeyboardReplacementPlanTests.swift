@@ -39,13 +39,13 @@ final class KeyboardReplacementPlanTests: XCTestCase {
 
     func testRejectsUnicodeDeletionIncludingPunctuationAndCombiningMarks() {
         for (text, word) in [("café ", "café"), ("cafe\u{301} ", "cafe\u{301}"),
-                             ("teh” ", "teh"), ("日本語 ", "日本語")] {
+                             ("teh\u{200D} ", "teh"), ("日本語 ", "日本語")] {
             XCTAssertNil(plan(text, word: word, replacement: "hello"), text)
         }
     }
 
     func testRejectsUnsafeDelimitersAndSuffixes() {
-        for suffix in ["", "x", "\t", "\n", "\r", "\0", "\u{7F}", "\u{00A0}", "/", "@", " next\nline", " next\tword", " café", " next🙂", String(repeating: " ", count: 97)] {
+        for suffix in ["", "x", "\t", "\n", "\r", "\0", "\u{7F}", "\u{200B}", "/", "@", " next\nline", " next\tword", " café", " next🙂", String(repeating: " ", count: 97)] {
             XCTAssertNil(plan("teh" + suffix, word: "teh", replacement: "the"), suffix.debugDescription)
         }
         XCTAssertNotNil(plan("teh" + String(repeating: " ", count: 96), word: "teh", replacement: "the"))

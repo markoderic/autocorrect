@@ -14,6 +14,16 @@ final class AccessibilityFallbackTests: XCTestCase {
         XCTAssertNil(AccessibilityText.boundedSubstring("teh ", reportedCount: 3, range: CFRange(location: 0, length: 3)))
         XCTAssertEqual(AccessibilityText.boundedSubstring("teh ", reportedCount: 4, range: CFRange(location: 0, length: 4)), "teh ")
     }
+    func testAttributedRangeFallbackRequiresAnExactBoundedResponse() {
+        let value = NSAttributedString(string: "🙂 speoll ")
+        XCTAssertEqual(AccessibilityText.attributedSubstring(value, expectedLength: 10), "🙂 speoll ")
+        for length in [-1, 9, 11, 513, Int.max] {
+            XCTAssertNil(AccessibilityText.attributedSubstring(value, expectedLength: length))
+        }
+        XCTAssertNil(AccessibilityText.attributedSubstring("teh ", expectedLength: 4))
+        XCTAssertNil(AccessibilityText.attributedSubstring(nil, expectedLength: 4))
+    }
+
     func testDetectsClaudeElectronFrameworkAndLeavesNativeAppsAlone() {
         let bundle = URL(fileURLWithPath: "/Applications/Claude.app")
         XCTAssertTrue(AccessibilityText.needsManualAccessibility(bundleURL: bundle) {

@@ -117,8 +117,7 @@ final class CorrectionEngine {
         if hadProposal { status = "Ready"; onChange?() }
         guard preferences.enabled, !flags.contains(.maskCommand), !flags.contains(.maskControl), !flags.contains(.maskAlternate),
               ![36, 48, 51, 53, 76, 115, 116, 117, 119, 121, 123, 124, 125, 126].contains(keyCode),
-              let text, text.utf16.count == 1, let scalar = text.unicodeScalars.first,
-              (0x20...0x7E).contains(scalar.value) else { resetTyping(); return }
+              let text, TypingTypography.isSupportedKeystroke(text) else { resetTyping(); return }
         backlog.append(text)
         readAttempts = 0
         attemptedBoundaries = attemptedBoundaries.filter { entry in backlog.boundaries.contains { $0.id == entry.key } }
@@ -342,7 +341,13 @@ final class CorrectionEngine {
                 return Assessment(misspelled: true, replacement: split, automatic: preferences.separatesJoinedWords)
             }
             if preferences.normalizesProductNames,
-               let product = NameLexicon.typoReplacement(for: word, systemCorrection: proposed, guesses: guesses) {
+               let product = NameLexicon.typoReplacement(for: word, systemCorrection: proposed, guesses: guesses),
+               (BuiltInReplacements.casing[product.lowercased()] == product ||
+                NameLexicon.canonicalReplacement(for: product.lowercased(), nativeMisspelled:
+                   checker.checkSpelling(of: product.lowercased(), startingAt: 0, language: preferences.language,
+                       wrap: false, inSpellDocumentWithTag: spellDocument, wordCount: nil).location != NSNotFound) != nil) {
+                // Company lists contain ordinary nouns (e.g. Business). A typo in an
+                // ordinary word must use prose casing, just like the correctly typed word.
                 return Assessment(misspelled: true, replacement: product, automatic: true)
             }
             let preserveCompound = CompoundSpellingPolicy.prefersUnchangedLetters(for: word, guesses: guesses)

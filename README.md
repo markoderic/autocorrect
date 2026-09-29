@@ -4,9 +4,11 @@ Autocorrect that keeps up with your typing. A small Mac menu bar app that fixes 
 
 ## Download and install
 
-<a href="https://github.com/markoderic/autocorrect/releases/download/v0.3.6/AutoCorrect-0.3.6-universal.zip"><img src="docs/media/download-macos.svg" alt="Download AutoCorrect for macOS" width="296" height="56"></a>
+<a href="https://github.com/markoderic/autocorrect/releases/download/v0.3.7/AutoCorrect-0.3.7-universal.zip"><img src="docs/media/download-macos.svg" alt="Download AutoCorrect for macOS" width="296" height="56"></a>
 
-[Download ZIP](https://github.com/markoderic/autocorrect/releases/download/v0.3.6/AutoCorrect-0.3.6-universal.zip) · **macOS 13 or later** · Apple silicon and Intel · [v0.3.6 preview](https://github.com/markoderic/autocorrect/releases/tag/v0.3.6)
+[Download ZIP](https://github.com/markoderic/autocorrect/releases/download/v0.3.7/AutoCorrect-0.3.7-universal.zip) · **macOS 13 or later** · Apple silicon and Intel · [v0.3.7 preview](https://github.com/markoderic/autocorrect/releases/tag/v0.3.7)
+
+**Preview installation notice:** Apple has not notarized this download yet. If you see **“Apple cannot check it for malicious software,”** that is the known first-launch limitation described below. Homebrew installs the same unnotarized build. [Signing status and release process](docs/NOTARIZATION.md).
 
 1. **Download** using the button above, then double-click the ZIP to unzip it.
 2. **Drag AutoCorrect.app into Applications**, then open it from there.
@@ -46,14 +48,15 @@ Then open **AutoCorrect** from **Applications** and follow steps 3–4 above. Th
 
 **This is an early release.** App compatibility varies; it cannot correct text in every app or field. See [validation and known limits](docs/VALIDATION.md).
 
-## What changed in 0.3.6
+## What changed in 0.3.7
 
-- **Missing doubled consonants:** `kiding → kidding` now wins over unrelated native guesses such as “riding.” The same bounded rule covers missing or extra doubled consonants across ordinary words, including `runing`, `begining`, `swiming`, `shoping`, `acident`, and `adress`. It uses dictionary candidates rather than a fixed replacement for each typo.
-- **Damaged invitations:** `leets see → let's see`, including capitalized sentence starts. `leets` is accepted by the native dictionary, so this repair uses the following invitation verb. Isolated `leets` and valid uses of `lets` are preserved.
-- **Missing native recommendations:** a strong ranked suggestion can still apply when macOS omits its separate automatic recommendation. Matching ends, candidate uniqueness or preserved-letter insertions, and distance checks constrain this fallback.
-- **Regression coverage:** full typing previews cover both reported sentences, fifteen repeated-consonant examples, valid-word counterexamples, user overrides, following-text preservation, and undo. Tests establish these behaviors, not a universal spelling-accuracy percentage.
+- **Rich-text typing:** words inside straight or smart quotes can be corrected while preserving their quotes. Nonbreaking spaces used by editors are recognized as word boundaries. Replacement and undo preserve those spaces and following text exactly.
+- **Ordinary-word casing:** a typo such as `buisness` becomes `business`, not `Business` just because the company-name data contains that word. Explicit product names still keep their casing.
+- **Additional Accessibility read path:** editors that expose attributed text ranges can supply the same bounded snapshot without requiring a full-document read. The existing real-caret, focus, selection, secure-field, and stale-text checks remain required.
+- **Accuracy checks:** 78 everyday misspellings in three contexts include `speoll → spell`, missing letters, transpositions, and doubled consonants. These are regression fixtures, not a general accuracy percentage.
+- **Distribution:** stable release preparation now requires Developer ID signing, notarization, stapling, and Gatekeeper verification of the final extracted download. **This preview is still unnotarized** until the required certificate and notarization credentials are configured.
 
-Automatic mode, sentence capitalization after `. ? !`, missing-space repairs, and manual-rewrite protection remain included. [Test evidence](docs/VALIDATION.md) · [Underline limitations](docs/SPACING-AND-UNDERLINES.md).
+[Validation and remaining 1.0 gates](docs/VALIDATION.md) · [Signing details](docs/NOTARIZATION.md).
 
 ## See it in action
 
@@ -84,7 +87,7 @@ This release handles **spelling, text expansion, capitalization, and a narrow se
 
 ## Compatibility and privacy
 
-AutoCorrect relies on each app exposing a usable text field through macOS Accessibility. For Electron apps such as Claude and detected Chromium browsers, it requests accessibility support on activation. Some apps need about two seconds to expose their text tree. Successful requests are made once per process launch; transient failures have bounded retries. Rich editors without a character-count attribute can use a bounded text-value fallback when they expose a real caret. Some browser editors, custom controls, terminals, remote desktops, and apps with restricted accessibility will not work. It skips password fields, unsupported fields, and input methods that use composition (IME). Common coding apps, terminals, and password managers are paused by default; use **Paused Apps** to change those exclusions. It checks that the focus, selection, and surrounding text still match before applying a correction. Corrections no longer write selected text through Accessibility, which could leave a word selected and cause the next keystroke to overwrite it. A complete keyboard edit is prepared before anything is deleted; stale edits are canceled, and verification never retries a deletion. Deleted words/phrases and any replayed following text must be ASCII for predictable backspace behavior; the preceding text and replacement may contain Unicode. Fast typing retains up to eight completed-word boundaries and briefly retries stale Accessibility reads. Navigation, focus changes, and editing commands cancel those pending checks. It does not promise support for every app.
+AutoCorrect relies on each app exposing a usable text field through macOS Accessibility. For Electron apps such as Claude and detected Chromium browsers, it requests accessibility support on activation. Some apps need about two seconds to expose their text tree. Successful requests are made once per process launch; transient failures have bounded retries. Editors that expose attributed text ranges have a bounded range fallback. Rich editors without a character-count attribute can use a bounded text-value fallback when they expose a real caret. Some browser editors, custom controls, terminals, remote desktops, and apps with restricted accessibility will not work. It skips password fields, unsupported fields, and input methods that use composition (IME). Common coding apps, terminals, and password managers are paused by default; use **Paused Apps** to change those exclusions. It checks that the focus, selection, and surrounding text still match before applying a correction. Corrections no longer write selected text through Accessibility, which could leave a word selected and cause the next keystroke to overwrite it. A complete keyboard edit is prepared before anything is deleted; stale edits are canceled, and verification never retries a deletion. Deleted words/phrases and any replayed following text must use ASCII or the explicitly supported single-unit smart quotes and nonbreaking spaces for predictable backspace behavior; the preceding text and replacement may contain Unicode. Fast typing retains up to eight completed-word boundaries and briefly retries stale Accessibility reads. Navigation, focus changes, and editing commands cancel those pending checks. It does not promise support for every app.
 
 Spelling checks run locally through `NSSpellChecker`. AutoCorrect does not send your text to a server or save a typing history. It inspects at most 256 UTF-16 units before the cursor, with a bounded fallback for small fields, and caches up to 256 spelling results in memory. App exclusions, deliberately ignored words, and settings are stored locally. macOS may also apply its own spelling corrections; if you see conflicting behavior, disable one of the correction systems for that app.
 
@@ -107,8 +110,8 @@ The build script compiles **arm64 and x86_64**, combines them into a universal e
 
 ```text
 dist/AutoCorrect.app
-dist/AutoCorrect-0.3.6-universal.zip
-dist/AutoCorrect-0.3.6-universal.zip.sha256
+dist/AutoCorrect-0.3.7-universal.zip
+dist/AutoCorrect-0.3.7-universal.zip.sha256
 ```
 
 It can be called from any working directory. The installer uses `/Applications` when writable, otherwise `~/Applications`. Use `--user` to choose `~/Applications`, `--no-open` to install without launching, and `--replace` to replace an existing installation. Quit AutoCorrect before replacing it; the installer preserves the previous bundle alongside the new one.
@@ -139,7 +142,7 @@ For a manual check after granting permissions:
 
 ## Publish a release
 
-`./scripts/release.sh` prepares the archive and checksum locally. Set `VERSION` to build another version. Before publishing, update the cask's version and SHA-256 to match the exact final archive, and upload the archive to the matching GitHub `vVERSION` release. The release script does not publish anything itself.
+`./scripts/release.sh` prepares a notarized archive and checksum locally and requires a Developer ID Application identity plus a notarization keychain profile. See [the signing setup](docs/NOTARIZATION.md). For an explicitly unnotarized preview, use `RELEASE_CHANNEL=preview ./scripts/release.sh`. Before publishing, update the cask version and SHA-256 to match the exact final archive and upload it to the matching GitHub `vVERSION` release. The scripts do not publish anything themselves.
 
 ## Uninstall
 

@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
-VERSION="${VERSION:-0.3.6}"
+VERSION="${VERSION:-0.3.7}"
 SIGNING_IDENTITY="${SIGNING_IDENTITY:--}"
 APP="$ROOT/dist/AutoCorrect.app"
 
@@ -15,7 +15,7 @@ for command in swift xcrun codesign ditto; do
   command -v "$command" >/dev/null || { echo "error: missing $command. Install Xcode Command Line Tools." >&2; exit 1; }
 done
 [[ -f Package.swift ]] || { echo "error: Package.swift is missing from $ROOT." >&2; exit 1; }
-[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "error: VERSION must have the form 0.3.6." >&2; exit 1; }
+[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "error: VERSION must have the form 0.3.7." >&2; exit 1; }
 
 mkdir -p "$ROOT/dist"
 STAGING="$(mktemp -d "${TMPDIR:-/tmp}/autocorrect-build.XXXXXX")"
@@ -44,7 +44,11 @@ fi
 # Documents/iCloud can attach FinderInfo to newly generated bundles.
 # Clear build-output metadata only so codesign can seal this local app.
 xattr -cr "$BUNDLE"
-codesign --force --sign "$SIGNING_IDENTITY" "$BUNDLE"
+if [[ "$SIGNING_IDENTITY" == "Developer ID Application:"* ]]; then
+  codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" "$BUNDLE"
+else
+  codesign --force --sign "$SIGNING_IDENTITY" "$BUNDLE"
+fi
 codesign --verify --strict --verbose=2 "$BUNDLE"
 for ARCH in arm64 x86_64; do
   xcrun lipo "$BUNDLE/Contents/MacOS/AutoCorrect" -verify_arch "$ARCH"
