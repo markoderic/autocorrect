@@ -39,7 +39,7 @@ final class KeyboardReplacementPlanTests: XCTestCase {
 
     func testRejectsUnicodeDeletionIncludingPunctuationAndCombiningMarks() {
         for (text, word) in [("café ", "café"), ("cafe\u{301} ", "cafe\u{301}"),
-                             ("don’t ", "don’t"), ("teh” ", "teh"), ("日本語 ", "日本語")] {
+                             ("teh” ", "teh"), ("日本語 ", "日本語")] {
             XCTAssertNil(plan(text, word: word, replacement: "hello"), text)
         }
     }
@@ -121,7 +121,7 @@ final class KeyboardReplacementPlanTests: XCTestCase {
         for text in ["prefixI don't know next", "@I don't know next", "obj.I don't know next"] {
             XCTAssertNil(plan(text, word: "I don't know", replacement: "idk"), text)
         }
-        for phrase in ["I don't know!", "'I don't know", "I don't kn0w0", "I don’t know", "I don't\nknow", "I don't\tknow"] {
+        for phrase in ["I don't know!", "'I don't know", "I don't kn0w0", "I don't\nknow", "I don't\tknow"] {
             XCTAssertNil(plan(phrase + " next", word: phrase, replacement: "idk"), phrase)
         }
         XCTAssertNil(plan("I don't knowmore ", word: "I don't know", replacement: "idk"))

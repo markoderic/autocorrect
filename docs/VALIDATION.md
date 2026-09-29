@@ -1,3 +1,16 @@
+# 0.3.4 validation
+
+Checked September 29, 2026 on the development Mac.
+
+- **129 automated tests passed, 0 failures.** Actual native-checker integration covers nine joined-word examples, valid compounds/filenames, user overrides, the new automatic-spacing setting, reported straight/curly apostrophes, contextual `pleas help`, and plural-noun counterexamples. Shared edit-plan tests confirm smart-apostrophe deletion, exact following-text preservation, and reversal of `I know` back to `iknow`. Geometry fixtures cover missing whole-word bounds, missing endpoint bounds with equal line indices, wrapped lines, and invalid rectangles. Existing context, manual rewrite, undo, and transport tests remain in the suite.
+- Before changes, straight-apostrophe `doen'st` already passed engine assessment. The actual bug found was rejection of curly apostrophes in the shared replacement plan. This is a confirmed implementation gap, not proof that smart punctuation explains every missed correction in every host app.
+- Universal arm64/x86_64 builds and exact-archive signature, architecture, and bundled-license checks passed. ZIP: 1,600,404 bytes. SHA-256: `e3b0ef9f4aacd49e49fecd99ebe7597e3ba940afe0fb7719f91bd90a8473f242`. Public build is ad-hoc signed and not notarized.
+- Installed 0.3.4 with the existing local development signing identity and relaunched it. Process and installed diagnostics confirm Accessibility, Input Monitoring, active keyboard-listener capability, supported layout, and enabled login registration. Fixed installed-engine probes confirm `doen'st`, `doen’st`, `does’nt`, `iknow`, `thankyou`, `inthe`, and `myfriend` corrections; standalone valid `pleas` remains unchanged.
+- No new physical-keyboard or rendered-overlay cross-app pass is claimed. The CUA launch call timed out on the menu-only app, but the new process and versioned diagnostics independently confirmed startup. Geometry tests establish fallback decisions, not every editor's actual AX support.
+- No native macOS/other-app preference is changed. Research found per-editor controls and cached WebKit defaults, not a reliable live system-wide off/on contract. See [research and limitations](SPACING-AND-UNDERLINES.md). Persistent document-wide underlines, unrestricted semantic correction, all-app compatibility, and measured battery usage remain outside the evidence.
+
+---
+
 # 0.3.3 validation
 
 Checked September 29, 2026 on the development Mac.

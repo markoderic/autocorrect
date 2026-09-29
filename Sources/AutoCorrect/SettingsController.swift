@@ -168,9 +168,11 @@ final class SettingsController: NSWindowController, NSTableViewDataSource, NSTab
             label("Fix clear its/it’s and lets/let’s contexts after nearby words are complete. Uncertain changes need approval.", size: 12, secondary: true)
         ]))
         body.addArrangedSubview(card([
+            toggle("Fix missing spaces", value: preferences.separatesJoinedWords, action: #selector(setJoinedWords(_:))),
+            label("Separate clear two-word combinations such as iknow and thankyou.", size: 12, secondary: true),
             toggle("Capitalize after a period", value: preferences.capitalizesAfterPeriod, action: #selector(setCapitals(_:))),
             toggle("Show spelling underlines", value: preferences.showsSpellingIndicators, action: #selector(setUnderlines(_:))),
-            label("Underlines appear only where the app exposes the word’s position.", size: 12, secondary: true)
+            label("Marks the latest possible misspelling where the editor exposes its position. Other apps’ spelling settings stay unchanged.", size: 12, secondary: true)
         ]))
         body.addArrangedSubview(label("Changes save automatically. AutoCorrect leaves passwords and unsupported text fields alone.", size: 12, secondary: true))
     }
@@ -324,6 +326,7 @@ final class SettingsController: NSWindowController, NSTableViewDataSource, NSTab
     @objc private func setApproval(_ sender: NSButton) { preferences.asksBeforeCorrecting = sender.state == .on; changed() }
     @objc private func setContext(_ sender: NSButton) { preferences.checksContext = sender.state == .on; changed() }
     @objc private func setCapitals(_ sender: NSButton) { preferences.capitalizesAfterPeriod = sender.state == .on; changed() }
+    @objc private func setJoinedWords(_ sender: NSButton) { preferences.separatesJoinedWords = sender.state == .on; changed() }
     @objc private func setUnderlines(_ sender: NSButton) { preferences.showsSpellingIndicators = sender.state == .on; changed() }
     @objc private func setAbbreviations(_ sender: NSButton) { preferences.expandsAbbreviations = sender.state == .on; changed() }
     @objc private func setProducts(_ sender: NSButton) { preferences.normalizesProductNames = sender.state == .on; changed() }

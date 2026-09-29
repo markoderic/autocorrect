@@ -26,7 +26,7 @@ public enum EnglishWritingRules {
               original.allSatisfy({ ($0.asciiValue != nil && $0.isLetter) || $0 == "'" || $0 == "’" }) else { return nil }
         let source = original.lowercased().replacingOccurrences(of: "'", with: "").replacingOccurrences(of: "’", with: "")
         let candidates = contractions.filter { key, _ in
-            key.count >= 5 && CorrectionPolicy.editDistance(Array(source), Array(key)) == 1
+            key.count >= 5 && CorrectionPolicy.editDistance(Array(source), Array(key)) <= 1
         }
         guard candidates.count == 1, let (key, replacement) = candidates.first,
               source.prefix(2) == key.prefix(2) else { return nil }

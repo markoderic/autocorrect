@@ -40,8 +40,9 @@ public struct KeyboardReplacementPlan: Equatable, Sendable {
         let removed = original + suffix
         // Backspace semantics vary for composed characters. ASCII makes the count
         // unambiguous while still allowing any Unicode text in the untouched prefix.
+        // Smart apostrophes are also one UTF-16 unit and one deletion each.
         guard (1...216).contains(removed.utf16.count),
-              removed.unicodeScalars.allSatisfy({ (0x20...0x7E).contains($0.value) }) else { return nil }
+              removed.unicodeScalars.allSatisfy({ (0x20...0x7E).contains($0.value) || $0.value == 0x2019 || $0.value == 0x2018 }) else { return nil }
 
         let insertion = replacement + suffix
         let expected = prefix + insertion

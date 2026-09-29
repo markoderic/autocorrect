@@ -4,9 +4,9 @@ Autocorrect that keeps up with your typing. A small Mac menu bar app that fixes 
 
 ## Download and install
 
-<a href="https://github.com/markoderic/autocorrect/releases/download/v0.3.3/AutoCorrect-0.3.3-universal.zip"><img src="docs/media/download-macos.svg" alt="Download AutoCorrect for macOS" width="296" height="56"></a>
+<a href="https://github.com/markoderic/autocorrect/releases/download/v0.3.4/AutoCorrect-0.3.4-universal.zip"><img src="docs/media/download-macos.svg" alt="Download AutoCorrect for macOS" width="296" height="56"></a>
 
-[Download ZIP](https://github.com/markoderic/autocorrect/releases/download/v0.3.3/AutoCorrect-0.3.3-universal.zip) · **macOS 13 or later** · Apple silicon and Intel · [v0.3.3 preview](https://github.com/markoderic/autocorrect/releases/tag/v0.3.3)
+[Download ZIP](https://github.com/markoderic/autocorrect/releases/download/v0.3.4/AutoCorrect-0.3.4-universal.zip) · **macOS 13 or later** · Apple silicon and Intel · [v0.3.4 preview](https://github.com/markoderic/autocorrect/releases/tag/v0.3.4)
 
 1. **Download** using the button above, then double-click the ZIP to unzip it.
 2. **Drag AutoCorrect.app into Applications**, then open it from there.
@@ -46,15 +46,14 @@ Then open **AutoCorrect** from **Applications** and follow steps 3–4 above. Th
 
 **This is an early release.** App compatibility varies; it cannot correct text in every app or field. See [validation and known limits](docs/VALIDATION.md).
 
-## What changed in 0.3.3
+## What changed in 0.3.4
 
-- **Broader names and technical vocabulary:** 6,231 bundled recognition terms and 2,234 canonical name entries from selected CSpell dictionaries, plus common product/format rules. `powerpoint → PowerPoint`, `figma → Figma`, `microsoft → Microsoft`, `pdf → PDF`.
-- **Typos in names:** missing letters and swaps can become the correctly capitalized name, such as `powerpiont → PowerPoint`, `microsfot → Microsoft`, and `kubernets → Kubernetes`. Equally close dictionary alternatives block these automatic guesses.
-- **Damaged contractions:** `doenst`, `dosent`, and `dosen't` → `doesn't`; `woudlnt → wouldn't`. This repairs the spelling and apostrophe together.
-- **Harder misspellings:** longer words can qualify with up to three edits when the native recommendation and first-ranked guess agree and competing suggestions are farther away.
-- **Filename and URL protection:** periods and colons now wait for the next delimiter. Typing `doenst.txt`, `powerpoint.pptx`, or `https://github.com` does not trigger an early basename/scheme correction. Sentence-ending corrections happen after the following space.
+- **Missing spaces:** clear two-word combinations such as `iknow → I know`, `thankyou → thank you`, `inthe → in the`, and `myfriend → my friend`. A new **Fix missing spaces** setting controls automatic splitting. Valid dictionary words, recognized technical names, filenames, ignored words, and custom replacements retain priority. This is bounded local segmentation, not unrestricted sentence reconstruction.
+- **Smart apostrophes:** repairs can now be applied when a host editor turns an apostrophe curly, including `doen’st → doesn't`. Straight-apostrophe variants remain covered. Undo preserves following text.
+- **Contextual please:** `pleas help → please help` after the following word completes. Standalone `pleas` and the valid plural in `their pleas were heard` remain unchanged.
+- **Underline compatibility:** use character bounds when whole-word bounds are unavailable, or whole-word bounds plus matching line indices when character bounds are unavailable. Unsupported or wrapped geometry is still skipped instead of drawing in the wrong place.
 
-Ordinary words such as `apple`, `word`, `excel`, and `slack` are preserved; a company dictionary alone cannot establish their meaning. Names, spelling, context, undo, custom replacements, and ignored words still use the same controls. Recognition counts are dictionary sizes, **not an accuracy score or a list of every company**. [Research and decisions](docs/NAMES-AND-ACCURACY.md) · [Test evidence](docs/VALIDATION.md).
+The previous release's 6,231 recognition terms and 2,234 canonical name entries remain included. These counts are dictionary sizes, **not an accuracy score**. [Research and limitations](docs/SPACING-AND-UNDERLINES.md) · [Test evidence](docs/VALIDATION.md).
 
 ## See it in action
 
@@ -74,7 +73,8 @@ Ordinary words such as `apple`, `word`, `excel`, and `slack` are preserved; a co
 - **Settings → Ignored Words:** add names or words that should never be corrected or marked. Remove a word to check it again. Matching ignores capitalization.
 - **Settings → Text Replacements:** choose a typed shortcut and its replacement phrase (up to 120 characters), including exact capitalization. Add the same typed word again to update it. Ignored words take precedence over custom corrections.
 - **Settings → Writing → Capitalize after a period:** enabled by default. Capitalizes the next completed word when you type its space or punctuation (`Done. hello ` → `Done. Hello `). Turn it off independently of spelling correction. Common abbreviations, initials, decimals, URLs, and ambiguous period endings are skipped. Ignored words and exact custom replacements keep priority.
-- **Show Spelling Underlines:** optionally draw a red wavy underline beneath the latest completed possible misspelling. This requires the host app to expose the word's on-screen bounds. It clears on typing, clicking, scrolling, app switching, or after five seconds. It does not continuously mark the whole document.
+- **Fix missing spaces:** automatically separate clear two-word combinations; turn this off to review them instead.
+- **Show Spelling Underlines:** optionally draw a red wavy underline beneath the latest completed possible misspelling. This requires the host app to expose the word's on-screen bounds. It clears on typing, clicking, scrolling, app switching, or after five seconds. It does not continuously mark the whole document. AutoCorrect does not change other apps’ native spelling-underline settings; macOS has no verified universal live switch for those controls.
 - English (US) is the default; the language selector is in Settings. Uncertain dictionary suggestions require approval even in automatic mode.
 - Automatically requests launch at login on first launch; you can turn it off in the menu bar.
 - Uses read-only macOS Accessibility to check the field, then native keyboard input to correct it without temporarily selecting the word.
@@ -107,8 +107,8 @@ The build script compiles **arm64 and x86_64**, combines them into a universal e
 
 ```text
 dist/AutoCorrect.app
-dist/AutoCorrect-0.3.3-universal.zip
-dist/AutoCorrect-0.3.3-universal.zip.sha256
+dist/AutoCorrect-0.3.4-universal.zip
+dist/AutoCorrect-0.3.4-universal.zip.sha256
 ```
 
 It can be called from any working directory. The installer uses `/Applications` when writable, otherwise `~/Applications`. Use `--user` to choose `~/Applications`, `--no-open` to install without launching, and `--replace` to replace an existing installation. Quit AutoCorrect before replacing it; the installer preserves the previous bundle alongside the new one.

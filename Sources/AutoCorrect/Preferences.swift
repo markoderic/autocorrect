@@ -32,6 +32,10 @@ final class Preferences {
         get { defaults.object(forKey: "normalizesProductNames") as? Bool ?? true }
         set { defaults.set(newValue, forKey: "normalizesProductNames") }
     }
+    var separatesJoinedWords: Bool {
+        get { defaults.object(forKey: "separatesJoinedWords") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "separatesJoinedWords") }
+    }
     var checksContext: Bool {
         get { defaults.object(forKey: "checksContext") as? Bool ?? true }
         set { defaults.set(newValue, forKey: "checksContext") }

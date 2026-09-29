@@ -57,7 +57,7 @@ public enum ContextualWritingRules {
             let range = matches[index].range
             let original = text.substring(with: range)
             let normalized = original.lowercased().replacingOccurrences(of: "’", with: "'")
-            guard ["its", "it's", "lets"].contains(normalized),
+            guard ["its", "it's", "lets", "pleas"].contains(normalized),
                   !original.dropFirst().contains(where: { $0.isUppercase }),
                   isWordBoundary(before: range.location, in: completedText) else { continue }
             let following = Array(matches[(index + 1)...])
@@ -71,7 +71,12 @@ public enum ContextualWritingRules {
             var replacement: String?
             var explanation = ""
             var automatic = false
-            if normalized == "its", isSubjectPosition(at: range.location, in: text) {
+            if normalized == "pleas", startsClause(at: range.location, in: text),
+               invitationVerbs.union(["help", "let", "tell", "explain", "confirm", "reply", "respond", "remember", "leave", "wait"]).contains(after[0]) {
+                replacement = "please"
+                explanation = "This request uses ‘please’. The plural noun ‘pleas’ is preserved in other contexts."
+                automatic = true
+            } else if normalized == "its", isSubjectPosition(at: range.location, in: text) {
                 let predicateIndex = degreeAdverbs.contains(after[0]) ? 1 : 0
                 let hasPredicate = after.count > predicateIndex && predicateWords.contains(after[predicateIndex])
                 // Wait beyond an adjective: "its good looks" and "its working parts"

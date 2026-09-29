@@ -303,7 +303,7 @@ final class CorrectionEngine {
         }
         let text = context ?? word
         let wordRange = range ?? NSRange(location: 0, length: (word as NSString).length)
-        let key = preferences.language + ":" + String(preferences.normalizesProductNames) + ":" + text + ":" + String(wordRange.location)
+        let key = preferences.language + ":" + String(preferences.normalizesProductNames) + ":" + String(preferences.separatesJoinedWords) + ":" + text + ":" + String(wordRange.location)
         if let value = cache[key] { return value }
         let checker = NSSpellChecker.shared
         let misspelled = checker.checkSpelling(of: word, startingAt: 0, language: preferences.language, wrap: false, inSpellDocumentWithTag: spellDocument, wordCount: nil)
@@ -322,6 +322,13 @@ final class CorrectionEngine {
             if let contraction = EnglishWritingRules.typoReplacement(for: word, language: preferences.language,
                                                                      systemCorrection: proposed, guesses: guesses) {
                 return Assessment(misspelled: true, replacement: contraction, automatic: true)
+            }
+            if let split = JoinedWordPolicy.replacement(for: word, language: preferences.language,
+                    systemCorrection: proposed, guesses: guesses, isWord: { part in
+                        checker.checkSpelling(of: part, startingAt: 0, language: self.preferences.language,
+                            wrap: false, inSpellDocumentWithTag: self.spellDocument, wordCount: nil).location == NSNotFound
+                    }) {
+                return Assessment(misspelled: true, replacement: split, automatic: preferences.separatesJoinedWords)
             }
             if preferences.normalizesProductNames,
                let product = NameLexicon.typoReplacement(for: word, systemCorrection: proposed, guesses: guesses) {

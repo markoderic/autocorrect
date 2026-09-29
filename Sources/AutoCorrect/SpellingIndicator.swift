@@ -21,14 +21,17 @@ final class SpellingIndicator {
         // End-character bounds distinguish a single line from a wrapped word's union rect.
         let first = text.rangeOfComposedCharacterSequence(at: range.location)
         let last = text.rangeOfComposedCharacterSequence(at: NSMaxRange(range) - 1)
-        guard let wordBounds = bounds(for: absoluteRange, element: snapshot.element),
-              let firstBounds = bounds(for: CFRange(location: snapshot.windowStart + first.location, length: first.length), element: snapshot.element),
-              let lastBounds = bounds(for: CFRange(location: snapshot.windowStart + last.location, length: last.length), element: snapshot.element),
-              valid(wordBounds), valid(firstBounds), valid(lastBounds),
-              abs(firstBounds.midY - lastBounds.midY) <= max(firstBounds.height, lastBounds.height) * 0.3,
-              wordBounds.height <= max(firstBounds.height, lastBounds.height) * 1.4,
-              AccessibilityText.stillMatches(snapshot),
-              let frame = overlayFrame(for: wordBounds) else { return }
+        let wordBounds = bounds(for: absoluteRange, element: snapshot.element)
+        let firstBounds = bounds(for: CFRange(location: snapshot.windowStart + first.location, length: first.length), element: snapshot.element)
+        let lastBounds = bounds(for: CFRange(location: snapshot.windowStart + last.location, length: last.length), element: snapshot.element)
+        var geometry = UnderlineGeometry.singleLine(word: wordBounds, first: firstBounds, last: lastBounds)
+        if geometry == nil, firstBounds == nil || lastBounds == nil {
+            geometry = UnderlineGeometry.singleLine(word: wordBounds, first: firstBounds, last: lastBounds,
+                firstLine: line(at: absoluteRange.location, element: snapshot.element),
+                lastLine: line(at: absoluteRange.location + absoluteRange.length - 1, element: snapshot.element))
+        }
+        guard let geometry, AccessibilityText.stillMatches(snapshot),
+              let frame = overlayFrame(for: geometry) else { return }
 
         let window: UnderlinePanel
         if let panel = panel {
@@ -85,9 +88,11 @@ final class SpellingIndicator {
         return result
     }
 
-    private func valid(_ rect: CGRect) -> Bool {
-        rect.origin.x.isFinite && rect.origin.y.isFinite && rect.width.isFinite && rect.height.isFinite &&
-            rect.width >= 1 && rect.width <= 1_200 && rect.height >= 4 && rect.height <= 100
+    private func line(at index: Int, element: AXUIElement) -> Int? {
+        var output: CFTypeRef?
+        guard AXUIElementCopyParameterizedAttributeValue(element, kAXLineForIndexParameterizedAttribute as CFString,
+            NSNumber(value: index), &output) == .success, let number = output as? NSNumber else { return nil }
+        return number.intValue
     }
 
     private func overlayFrame(for quartzRect: CGRect) -> NSRect? {
