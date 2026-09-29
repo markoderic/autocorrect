@@ -26,7 +26,9 @@ final class CorrectionEngine {
     private var attemptedBoundaries: [UInt64: Int] = [:]
     private var manualRewrites = ManualRewriteProtection()
     private var rewriteField: (pid: pid_t, element: AXUIElement, id: UUID)?
-    private let spellDocument = NSSpellChecker.uniqueSpellDocumentTag()
+    // Each query is a bounded snapshot from potentially different apps/fields, not
+    // one persistent document. Apple's documented tag 0 is for unassociated text.
+    private let spellDocument = 0
     private struct Assessment {
         let misspelled: Bool
         let replacement: String?
@@ -473,5 +475,5 @@ final class CorrectionEngine {
         onChange?()
     }
 
-    deinit { monitor.stop(); NSSpellChecker.shared.closeSpellDocument(withTag: spellDocument) }
+    deinit { monitor.stop() }
 }
