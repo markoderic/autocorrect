@@ -1,10 +1,52 @@
 # AutoCorrect
 
-A small native macOS menu bar app that corrects spelling when you finish typing a word. It uses Apple's built-in spell checker on your Mac. No accounts, subscriptions, network services, downloaded models, or third-party dependencies.
+Autocorrect that keeps up with your typing. A small Mac menu bar app that fixes spelling, expands shortcuts, and lets you keep the words you meant to type. Text processing stays on your Mac. Free and open source.
 
-Requires **macOS 13 Ventura or later**, on Apple silicon or Intel.
+## Download and install
 
-**0.3.1 is a preview.** Unit tests, universal packaging, local launch, and login registration have been checked. Compatibility with individual editors and underline placement still need real keyboard testing; see [validation](docs/VALIDATION.md).
+<a href="https://github.com/markoderic/autocorrect/releases/download/v0.3.1/AutoCorrect-0.3.1-universal.zip"><img src="docs/media/download-macos.svg" alt="Download AutoCorrect for macOS" width="296" height="56"></a>
+
+[Download ZIP](https://github.com/markoderic/autocorrect/releases/download/v0.3.1/AutoCorrect-0.3.1-universal.zip) · **macOS 13 or later** · Apple silicon and Intel · [v0.3.1 preview](https://github.com/markoderic/autocorrect/releases/tag/v0.3.1)
+
+1. **Download** using the button above, then double-click the ZIP to unzip it.
+2. **Drag AutoCorrect.app into Applications**, then open it from there.
+3. **Allow Accessibility and Input Monitoring** when prompted. Find both under **System Settings → Privacy & Security**. Quit and reopen AutoCorrect after allowing them.
+4. **Start typing.** Look for AutoCorrect in your menu bar to change settings or pause it.
+
+**If macOS blocks the first launch:** this preview is not Apple notarized. After trying to open it, go to **System Settings → Privacy & Security → Open Anyway** for AutoCorrect, if you trust this release. [Apple’s first-open instructions](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/mac).
+
+### Prefer Homebrew? Two commands
+
+Already have [Homebrew](https://brew.sh)? Open **Terminal** and run these one at a time.
+
+**1. Add AutoCorrect:**
+
+```sh
+brew tap markoderic/autocorrect https://github.com/markoderic/autocorrect.git
+```
+
+**2. Install it:**
+
+```sh
+brew install --cask markoderic/autocorrect/autocorrect
+```
+
+Then open **AutoCorrect** from **Applications** and follow steps 3–4 above. The same first-open instructions apply. No Homebrew? Use the download button instead.
+
+<details>
+<summary>More about permissions and launch at login</summary>
+
+- **Accessibility** lets AutoCorrect inspect the focused text field and replace the completed word.
+- **Input Monitoring** lets it notice when you finish a word while typing in another app.
+- AutoCorrect requests launch at login on first launch. macOS may require approval under **System Settings → General → Login Items**. The menu shows its status and lets you enable or disable it.
+- Install in Applications before granting permissions. If a rebuilt app stops working, check permissions again: ad-hoc signatures can change between builds. Developers can use a stable local signing identity with the build script.
+- The Homebrew package is maintained by this project, outside the official Homebrew cask collection. It installs the same app as the download button.
+
+</details>
+
+**This is an early release.** App compatibility varies; it cannot correct text in every app or field. See [validation and known limits](docs/VALIDATION.md).
+
+## See it in action
 
 ![Illustrated AutoCorrect demo](docs/media/autocorrect-demo.gif)
 
@@ -29,34 +71,6 @@ Requires **macOS 13 Ventura or later**, on Apple silicon or Intel.
 - Runs in the background without a Dock icon. Settings opens only when requested.
 
 This release handles **spelling, text expansion, capitalization, and a narrow set of contextual English suggestions**. It does not provide comprehensive grammar, tone, or rewriting. Apple's dictionaries cover common and uncommon words, but are not an exhaustive list of every English word, name, or technical term. Short missing-letter typos now use native-ranked suggestions too: for example, `ths → this` and `frm → from`. Longer misspellings can use the first native-ranked guess, with edit-distance and ambiguity checks (`capitazed → capitalized` on the development Mac). These are general edit rules, not a fixed list of typos; ambiguous words can still be wrong or left unchanged. If the native top suggestion only separates the exact typed letters with a space or hyphen, the app offers that for review instead of automatically substituting a different word (`homebrew` no longer automatically becomes `homebred`). A misspelling without a reliable automatic correction is flagged for review when supported; no correction is guaranteed for every word.
-
-## Install
-
-Download `AutoCorrect-0.3.1-universal.zip` from [Releases](https://github.com/markoderic/autocorrect/releases), unzip it, and move **AutoCorrect.app** to **Applications**. Open it and look for its menu bar item.
-
-Release builds are **ad-hoc signed and not Apple notarized**. macOS may block the first launch of a downloaded copy. If you trust the source, attempt to open the app, then go to **System Settings → Privacy & Security → Open Anyway** and confirm. Follow the macOS instructions shown for your version. You do not need to disable Gatekeeper.
-
-### Permissions
-
-Open **AutoCorrect → Permissions** and grant the permissions it requests in **System Settings → Privacy & Security**:
-
-1. **Accessibility:** lets AutoCorrect inspect the focused text field and replace the completed word.
-2. **Input Monitoring:** lets AutoCorrect notice word boundaries while you type in another app.
-
-macOS requires you to approve these permissions yourself. If you change permissions, quit and reopen AutoCorrect. Install it in its permanent location before the first launch. AutoCorrect automatically attempts to enable launch at login on first launch; macOS may require approval under **System Settings → General → Login Items**. The menu shows the actual status and lets you retry or disable it.
-
-If a rebuilt app stops working, check its permissions again. Ad-hoc signatures can change between builds. Developers can use a stable local signing identity with the build script.
-
-### Homebrew
-
-Install the project-maintained cask:
-
-```sh
-brew tap markoderic/autocorrect https://github.com/markoderic/autocorrect.git
-brew install --cask markoderic/autocorrect/autocorrect
-```
-
-The cask installs the same app and has the same permissions and first-launch requirements. It is a project-maintained cask, not part of the official Homebrew cask collection.
 
 ## Compatibility and privacy
 
