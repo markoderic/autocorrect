@@ -100,6 +100,20 @@ public enum CorrectionPolicy {
                 return replacement
             }
         }
+        // A uniquely closest top-ranked missing-letter guess can repair short words
+        // even when macOS supplies no automatic recommendation. Ties remain for review.
+        if (3...4).contains(source.count), let first = guesses.first {
+            let target = Array(UserDictionary.normalizedKey(first))
+            if target.count == source.count + 1, isSingleEdit(source, target),
+               !guesses.prefix(5).dropFirst().contains(where: {
+                   let other = Array(UserDictionary.normalizedKey($0))
+                   return other != target && editDistance(source, other) <= 1
+               }),
+               systemCorrection == nil || UserDictionary.normalizedKey(systemCorrection!) == UserDictionary.normalizedKey(first),
+               let replacement = validatedReplacement(for: original, suggestion: first, allowShortInsertion: true) {
+                return replacement
+            }
+        }
         if let systemCorrection,
            let replacement = validatedReplacement(for: original, suggestion: systemCorrection, allowShortInsertion: true) {
             return replacement
@@ -143,7 +157,7 @@ public enum CorrectionPolicy {
     /// transposition. Work is bounded by our 32-character word limit and five native guesses.
     /// Sources: https://norvig.com/spell-correct.html and https://github.com/wolfgarbe/SymSpell
     /// Unlike those full correctors, this layer only validates candidates provided by macOS.
-    private static func editDistance(_ source: [Character], _ target: [Character]) -> Int {
+    static func editDistance(_ source: [Character], _ target: [Character]) -> Int {
         var rows = Array(repeating: Array(repeating: 0, count: target.count + 1), count: source.count + 1)
         for i in 0...source.count { rows[i][0] = i }
         for j in 0...target.count { rows[0][j] = j }

@@ -165,7 +165,7 @@ final class SettingsController: NSWindowController, NSTableViewDataSource, NSTab
             toggle("Ask before correcting", value: preferences.asksBeforeCorrecting, action: #selector(setApproval(_:))),
             label("Review suggestions from the menu bar before they change your text.", size: 12, secondary: true),
             toggle("Check surrounding context", value: preferences.checksContext, action: #selector(setContext(_:))),
-            label("Suggest its/it’s and lets/let’s changes from nearby words. These always need your approval.", size: 12, secondary: true)
+            label("Fix clear its/it’s and lets/let’s contexts after nearby words are complete. Uncertain changes need approval.", size: 12, secondary: true)
         ]))
         body.addArrangedSubview(card([
             toggle("Capitalize after a period", value: preferences.capitalizesAfterPeriod, action: #selector(setCapitals(_:))),

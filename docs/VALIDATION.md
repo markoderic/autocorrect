@@ -1,3 +1,18 @@
+# 0.3.2 validation
+
+Checked September 29, 2026 on the development Mac.
+
+- **112 automated tests passed, 0 failures.** New integration tests call the actual native spell checker for product typos, missing-letter cases, and five screenshot typos in four sentence contexts. Core fixtures cover conservative short-word ambiguity, each boundary's one-spelling/one-context edit limit, contextual positive/negative cases, approval/settings overrides, following-text preservation, undo anchors, and manual rewrite protection.
+- `github → GitHub`, `iphoen / iphne / iphnoe → iPhone`, and `githbu / githb → GitHub` pass. Correct `screenshot`, `homebrew`, ordinary `phone` / `siphon`, mixed-case product names, and structured tokens remain unchanged in the checked fixtures.
+- Automatic context examples pass: `lets improve this`, `okay, lets fix this`, `its a screenshot`, `its ready.`, `its working now`, and `it's screen is broken`. Valid `she lets go`, `its good looks`, `its working parts`, `its ready meals`, and `despite its not working` are preserved. A following word or punctuation is needed: bare `its` / `lets` and incomplete adjective contexts stay unchanged.
+- Queued context checks now use each completed prefix, including when another word has begun. Each boundary can post at most one spelling edit and one context edit, preventing cycles between custom replacements. This is covered at the queue/policy/plan level; it is not a real typing speed measurement.
+- Both arm64 and x86_64 release builds passed. Public archive: 1,494,644 bytes. SHA-256: `c4e5fd1dc13970ede699a83277f58e9ad1741da2c76fd3661cc0ca1fd2c1ce14`. Public build is ad-hoc signed and not notarized.
+- Installed 0.3.2 with the existing local development signing identity. Its diagnostics report Accessibility, Input Monitoring, keyboard listener, supported input source, and enabled login registration. Existing preferences were retained. The installed binary's fixed spelling/context checks confirm the examples above.
+- **No new physical-keyboard compatibility pass is claimed.** The computer-use tool typed a disposable TextEdit fixture in the background while macOS still identified another app as frontmost; the fixture was not corrected. That does not exercise this utility's foreground-keyboard path. The fixture was saved separately and closed; existing documents were not edited. ChatGPT/Claude delivery, rapid typing, and native undo still require real foreground typing to establish end-to-end behavior.
+- `har` is accepted by the local dictionary and remains unchanged. The app does not yet infer an arbitrary intended word from sentence meaning. This is bounded local spelling/context logic, not Grammarly-equivalent semantic correction, a held-out accuracy benchmark, or a 1.0 certification.
+
+---
+
 # 0.3.1 validation
 
 Checked September 29, 2026 on Apple silicon, macOS 26.6, Swift 6.4.

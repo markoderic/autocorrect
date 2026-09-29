@@ -51,7 +51,7 @@ final class RankedSpellingCorpusTests: XCTestCase {
             ("two letter token", "tp", ["to"]),
             ("short substitution", "teh", ["tea"]),
             ("short deletion", "too", ["to"]),
-            ("four letter guessing", "helo", ["hello"]),
+            ("four letter ambiguity", "helo", ["hello", "help"]),
             ("two edits too short", "adress", ["addressed"]),
             ("two edit changed first letter", "xapitalzed", ["capitalized"]),
             ("two edit changed last letter", "capitalzeq", ["capitalized"]),

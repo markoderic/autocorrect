@@ -155,37 +155,45 @@ final class CorrectionEngine {
                 backlog.remove(boundary.id)
                 continue
             }
-            guard let candidate = candidate(in: completed),
-                  snapshot.windowStart == 0 || candidate.range.location > 0,
-                  !preferences.ignoredWords.contains(UserDictionary.normalizedKey(candidate.original)),
-                  !isManualRewrite(candidate, snapshot: snapshot) else {
-                backlog.remove(boundary.id)
-                continue
+            if !boundary.spellingCorrected, let candidate = candidate(in: completed),
+               snapshot.windowStart == 0 || candidate.range.location > 0,
+               !preferences.ignoredWords.contains(UserDictionary.normalizedKey(candidate.original)),
+               !isManualRewrite(candidate, snapshot: snapshot) {
+                let result = assessment(candidate.original, context: completed, range: candidate.range)
+                if result.misspelled {
+                    flaggedWord = candidate.original
+                    if let replacement = result.replacement {
+                        let proposal = Proposal(snapshot: snapshot, range: candidate.range, original: candidate.original,
+                                                replacement: replacement, created: Date())
+                        if preferences.asksBeforeCorrecting || !result.automatic {
+                            showSuggestion(proposal)
+                        } else {
+                            // Keep this boundary until both spelling and context have been
+                            // assessed against a fresh post-edit snapshot.
+                            perform(proposal, isUndo: false, andIgnore: false, boundaryID: boundary.id)
+                            return
+                        }
+                    } else {
+                        status = "Possible misspelling: \(candidate.original)"
+                        if preferences.showsSpellingIndicators { indicator.show(snapshot: snapshot, range: candidate.range) }
+                        onChange?()
+                    }
+                }
             }
-            let result = assessment(candidate.original, context: completed, range: candidate.range)
-            guard result.misspelled else { backlog.remove(boundary.id); continue }
-            flaggedWord = candidate.original
-            guard let replacement = result.replacement else {
-                backlog.remove(boundary.id)
-                status = "Possible misspelling: \(candidate.original)"
-                if preferences.showsSpellingIndicators { indicator.show(snapshot: snapshot, range: candidate.range) }
-                onChange?()
-                continue
-            }
-            let proposal = Proposal(snapshot: snapshot, range: candidate.range, original: candidate.original, replacement: replacement, created: Date())
-            if preferences.asksBeforeCorrecting || !result.automatic {
-                backlog.remove(boundary.id)
+            // Check each completed prefix, including while the next word is incomplete.
+            // Reading only snapshot.text here used to lose context checks during fast typing.
+            if !boundary.contextCorrected, pending == nil, let contextual = contextualCandidate(in: completed),
+               snapshot.windowStart == 0 || contextual.range.location > 0,
+               !isManualRewrite(CorrectionCandidate(original: contextual.original, range: contextual.range), snapshot: snapshot) {
+                let proposal = Proposal(snapshot: snapshot, range: contextual.range, original: contextual.original,
+                                        replacement: contextual.replacement, created: Date())
+                if contextual.automatic && !preferences.asksBeforeCorrecting {
+                    perform(proposal, isUndo: false, andIgnore: false, boundaryID: boundary.id, contextual: true)
+                    return
+                }
                 showSuggestion(proposal)
-                continue
             }
-            perform(proposal, isUndo: false, andIgnore: false, boundaryID: boundary.id)
-            return
-        }
-        if pending == nil, let contextual = contextualCandidate(in: snapshot.text),
-           snapshot.windowStart == 0 || contextual.range.location > 0,
-           !isManualRewrite(CorrectionCandidate(original: contextual.original, range: contextual.range), snapshot: snapshot) {
-            showSuggestion(Proposal(snapshot: snapshot, range: contextual.range, original: contextual.original,
-                                    replacement: contextual.replacement, created: Date()))
+            backlog.remove(boundary.id)
         }
     }
 
@@ -210,7 +218,7 @@ final class CorrectionEngine {
                                         windowStart: snapshot.windowStart, now: ProcessInfo.processInfo.systemUptime)
     }
 
-    private func contextualCandidate(in text: String) -> ContextualWritingCandidate? {
+    func contextualCandidate(in text: String) -> ContextualWritingCandidate? {
         guard preferences.checksContext, preferences.language.lowercased().hasPrefix("en"),
               let candidate = ContextualWritingRules.candidate(in: text),
               !preferences.ignoredWords.contains(UserDictionary.normalizedKey(candidate.original)),
@@ -245,9 +253,13 @@ final class CorrectionEngine {
         var output = ""
         for character in completed {
             output.append(character)
-            if CorrectionPolicy.isDelimiter(character), let candidate = candidate(in: output),
-               let replacement = suggestion(in: output) {
-                output = (output as NSString).replacingCharacters(in: candidate.range, with: replacement)
+            if CorrectionPolicy.isDelimiter(character) {
+                if let candidate = candidate(in: output), let replacement = suggestion(in: output) {
+                    output = (output as NSString).replacingCharacters(in: candidate.range, with: replacement)
+                }
+                if let context = contextualCandidate(in: output), context.automatic && !preferences.asksBeforeCorrecting {
+                    output = (output as NSString).replacingCharacters(in: context.range, with: context.replacement)
+                }
             }
         }
         if let context = contextualCandidate(in: output) {
@@ -285,12 +297,15 @@ final class CorrectionEngine {
         }
         let text = context ?? word
         let wordRange = range ?? NSRange(location: 0, length: (word as NSString).length)
-        let key = preferences.language + ":" + text + ":" + String(wordRange.location)
+        let key = preferences.language + ":" + String(preferences.normalizesProductNames) + ":" + text + ":" + String(wordRange.location)
         if let value = cache[key] { return value }
         let checker = NSSpellChecker.shared
         let misspelled = checker.checkSpelling(of: word, startingAt: 0, language: preferences.language, wrap: false, inSpellDocumentWithTag: spellDocument, wordCount: nil)
         var answer = Assessment(misspelled: false, replacement: nil, automatic: false)
         if misspelled.location != NSNotFound {
+            if preferences.normalizesProductNames, let product = BuiltInReplacements.productTypoReplacement(for: word) {
+                return Assessment(misspelled: true, replacement: product, automatic: true)
+            }
             let proposed = checker.correction(forWordRange: wordRange, in: text, language: preferences.language, inSpellDocumentWithTag: spellDocument)
             let guesses = checker.guesses(forWordRange: wordRange, in: text, language: preferences.language, inSpellDocumentWithTag: spellDocument) ?? []
             let preserveCompound = CompoundSpellingPolicy.prefersUnchangedLetters(for: word, guesses: guesses)
@@ -316,7 +331,7 @@ final class CorrectionEngine {
 
     /// Editing goes through the receiving app's normal keyboard pipeline. Accessibility
     /// only reads the field; a failed check can never leave a word selected.
-    private func perform(_ proposal: Proposal, isUndo: Bool, andIgnore: Bool, boundaryID: UInt64? = nil) {
+    private func perform(_ proposal: Proposal, isUndo: Bool, andIgnore: Bool, boundaryID: UInt64? = nil, contextual: Bool = false) {
         indicator.hide()
         flaggedWord = nil
         guard !inFlight, preferences.enabled, monitor.isRunning, Date().timeIntervalSince(proposal.created) < 30,
@@ -357,7 +372,10 @@ final class CorrectionEngine {
                 self.scheduleCheck()
                 return
             }
-            if let boundaryID { self.backlog.remove(boundaryID); self.attemptedBoundaries.removeValue(forKey: boundaryID) }
+            if let boundaryID {
+                self.backlog.recordCorrection(boundaryID, contextual: contextual)
+                self.attemptedBoundaries.removeValue(forKey: boundaryID)
+            }
             if isUndo { self.undoProposal = nil; self.undoAnchor = nil }
             // A posted edit is never repeated, even if the editor is slow to confirm it.
             self.verify(proposal, plan: plan, epoch: epoch, isUndo: isUndo, andIgnore: andIgnore, protectionID: protectionID, attempt: 0)

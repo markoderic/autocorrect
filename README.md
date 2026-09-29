@@ -4,9 +4,9 @@ Autocorrect that keeps up with your typing. A small Mac menu bar app that fixes 
 
 ## Download and install
 
-<a href="https://github.com/markoderic/autocorrect/releases/download/v0.3.1/AutoCorrect-0.3.1-universal.zip"><img src="docs/media/download-macos.svg" alt="Download AutoCorrect for macOS" width="296" height="56"></a>
+<a href="https://github.com/markoderic/autocorrect/releases/download/v0.3.2/AutoCorrect-0.3.2-universal.zip"><img src="docs/media/download-macos.svg" alt="Download AutoCorrect for macOS" width="296" height="56"></a>
 
-[Download ZIP](https://github.com/markoderic/autocorrect/releases/download/v0.3.1/AutoCorrect-0.3.1-universal.zip) · **macOS 13 or later** · Apple silicon and Intel · [v0.3.1 preview](https://github.com/markoderic/autocorrect/releases/tag/v0.3.1)
+[Download ZIP](https://github.com/markoderic/autocorrect/releases/download/v0.3.2/AutoCorrect-0.3.2-universal.zip) · **macOS 13 or later** · Apple silicon and Intel · [v0.3.2 preview](https://github.com/markoderic/autocorrect/releases/tag/v0.3.2)
 
 1. **Download** using the button above, then double-click the ZIP to unzip it.
 2. **Drag AutoCorrect.app into Applications**, then open it from there.
@@ -46,6 +46,15 @@ Then open **AutoCorrect** from **Applications** and follow steps 3–4 above. Th
 
 **This is an early release.** App compatibility varies; it cannot correct text in every app or field. See [validation and known limits](docs/VALIDATION.md).
 
+## What changed in 0.3.2
+
+- **Context corrections can happen automatically:** `lets improve this` → `let's improve this`, `its a screenshot` → `it's a screenshot`, and `its ready.` → `it's ready.`
+- **Correct words stay correct:** `she lets go`, `its screen`, and `its good looks` stay unchanged. Context corrections wait for following words or punctuation; bare `lets` and `its` are ambiguous. Turn off **Writing → Check surrounding context** or enable **Ask before correcting** to control this.
+- **Product names and missing letters:** `github` → `GitHub`, `iphoen` → `iPhone`, `screensht` → `screenshot`, and more short missing-letter cases when native guesses agree clearly.
+- **Better handling during fast typing:** each queued completed word gets a context check even after the next word has started. Following text, undo, and manual-rewrite protections are retained.
+
+These are local spelling and context rules, not Grammarly-level sentence understanding. An ambiguous word such as `har` is not blindly replaced with `that`; macOS may accept it as correctly spelled. [Test evidence and remaining limits](docs/VALIDATION.md).
+
 ## See it in action
 
 ![Illustrated AutoCorrect demo](docs/media/autocorrect-demo.gif)
@@ -54,8 +63,8 @@ Then open **AutoCorrect** from **Applications** and follow steps 3–4 above. Th
 
 ## What it does
 
-- English writing rules capitalize standalone `i`, repair `im → I'm` and common missing apostrophes (`doesnt → doesn't`, `dont → don't`), and correct `ti → it`. Ignored words and custom corrections override these defaults. Valid ambiguous words such as `ill`, `well`, and `were` are preserved. Nearby-word rules suggest `its/it’s` and `lets/let’s` changes for narrow contexts; these always require approval.
-- Built-in abbreviation expansions: `idk → I don't know`, `omw → On my way`, `brb → Be right back`, `imo → in my opinion`, and `fyi → for your information`. Product/acronym casing includes `iphone → iPhone`, `ui → UI`, `ux → UX`, `api → API`, and `macos → macOS`. Both groups have independent switches in Text Replacements. Ignoring a shortcut disables it individually.
+- English writing rules capitalize standalone `i`, repair `im → I'm` and common missing apostrophes (`doesnt → doesn't`, `dont → don't`), and correct `ti → it`. Ignored words and custom corrections override these defaults. Valid ambiguous words such as `ill`, `well`, and `were` are preserved. Nearby-word rules now automatically fix clearer `its/it’s` and `lets/let’s` contexts; uncertain changes still require approval.
+- Built-in abbreviation expansions: `idk → I don't know`, `omw → On my way`, `brb → Be right back`, `imo → in my opinion`, and `fyi → for your information`. Product/acronym casing includes `iphone → iPhone`, `ui → UI`, `ux → UX`, `api → API`, and `macos → macOS`, and `github → GitHub`. A uniquely matching one-edit typo in a longer known product name can be repaired too (`iphoen → iPhone`, `githbu → GitHub`), after the native dictionary marks it misspelled. Both groups have independent switches in Text Replacements. Ignoring a shortcut disables it individually.
 - **Automatic mode:** replaces a misspelled word after a supported word boundary, such as a space.
 - **Approval mode:** offers a correction through the menu bar so you can decide whether to apply it. Suggestions expire after 30 seconds and are canceled by your next key press.
 - Undo the most recent correction with **Control–Option–Command–Z** or the menu bar, even after continuing to type. Undo lasts up to five minutes while the unchanged correction and its context remain within the bounded text window (up to 96 ASCII characters after it). It restores the original word or abbreviation and preserves following text. It does not replace your editor’s Command–Z.
@@ -97,8 +106,8 @@ The build script compiles **arm64 and x86_64**, combines them into a universal e
 
 ```text
 dist/AutoCorrect.app
-dist/AutoCorrect-0.3.1-universal.zip
-dist/AutoCorrect-0.3.1-universal.zip.sha256
+dist/AutoCorrect-0.3.2-universal.zip
+dist/AutoCorrect-0.3.2-universal.zip.sha256
 ```
 
 It can be called from any working directory. The installer uses `/Applications` when writable, otherwise `~/Applications`. Use `--user` to choose `~/Applications`, `--no-open` to install without launching, and `--replace` to replace an existing installation. Quit AutoCorrect before replacing it; the installer preserves the previous bundle alongside the new one.
@@ -123,7 +132,7 @@ For a manual check after granting permissions:
 2. Switch on **Ask Before Correcting**. Type a misspelling and a space, then open the menu without typing another key. Confirm the text stays unchanged until you choose **Apply** within 30 seconds.
 3. Move the cursor or change focus before approving. Confirm a stale suggestion does not change another field.
 4. Exclude TextEdit, then repeat the misspelling and confirm AutoCorrect leaves it alone.
-5. Type `idk next`, confirm `I don't know next`, then press Control–Option–Command–Z and confirm `idk next`. Try fast `i ths next`, sentence capitalization on/off, and `lets go` (approval only).
+5. Type `idk next`, confirm `I don't know next`, then press Control–Option–Command–Z and confirm `idk next`. Try fast `i ths next`, sentence capitalization on/off, and `lets go` with context checking on, then with approval mode enabled.
 6. Try the apps you use every day. Treat fields that do not work as unsupported.
 7. Check **Launch at Login** and verify it after your next login.
 

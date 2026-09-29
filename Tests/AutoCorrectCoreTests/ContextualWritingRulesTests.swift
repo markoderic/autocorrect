@@ -29,7 +29,7 @@ final class ContextualWritingRulesTests: XCTestCase {
     func testCorrectAndInsufficientContextsRemainUntouched() {
         for text in ["its color ", "its going rate ", "it's raining ", "it's color ", "it's color not shape ",
                      "she lets us ", "she lets go ", "the app lets users work ", "lets user ", "lets users ",
-                     "lets count ", "its going ", "its ", "lets ", "its a long lovely day ",
+                     "its going ", "its ", "lets ", "its a long lovely day ",
                      "ITS A ", "iTs a ", "LETS GO ", "it's good ", "let's go "] {
             XCTAssertNil(ContextualWritingRules.candidate(in: text), text)
         }

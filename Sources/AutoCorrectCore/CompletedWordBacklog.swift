@@ -7,6 +7,8 @@ public struct CompletedWordBacklog {
         public let id: UInt64
         public fileprivate(set) var trailingUTF16: Int
         public let delimiter: Character
+        public fileprivate(set) var spellingCorrected = false
+        public fileprivate(set) var contextCorrected = false
 
         public func completedPrefix(in text: String) -> String? {
             let end = text.utf16.count - trailingUTF16
@@ -39,6 +41,14 @@ public struct CompletedWordBacklog {
             if boundaries.count > 8 { boundaries.removeFirst(boundaries.count - 8) }
         }
         previousWasDelimiter = delimiter
+    }
+
+    /// A successful edit retains the boundary for the other pass only. Never run a
+    /// user mapping or context correction twice at the same boundary (A → B → A).
+    public mutating func recordCorrection(_ id: UInt64, contextual: Bool) {
+        guard let index = boundaries.firstIndex(where: { $0.id == id }) else { return }
+        if contextual { boundaries[index].contextCorrected = true }
+        else { boundaries[index].spellingCorrected = true }
     }
 
     public mutating func remove(_ id: UInt64) { boundaries.removeAll { $0.id == id } }

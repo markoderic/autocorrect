@@ -35,4 +35,24 @@ final class CompletedWordBacklogTests: XCTestCase {
         for character in "i next" { queue.append(String(character)) }
         XCTAssertNil(queue.boundaries.first?.completedPrefix(in: "changed"))
     }
+    func testEachBoundaryAllowsOnlyOneSpellingAndOneContextEdit() throws {
+        var backlog = CompletedWordBacklog()
+        for char in "its a " { backlog.append(String(char)) }
+        let id = try XCTUnwrap(backlog.boundaries.last?.id)
+        backlog.recordCorrection(id, contextual: false)
+        XCTAssertTrue(try XCTUnwrap(backlog.boundaries.last).spellingCorrected)
+        XCTAssertFalse(try XCTUnwrap(backlog.boundaries.last).contextCorrected)
+        backlog.append("n")
+        XCTAssertTrue(try XCTUnwrap(backlog.boundaries.last).spellingCorrected)
+        backlog.recordCorrection(id, contextual: true)
+        XCTAssertTrue(try XCTUnwrap(backlog.boundaries.last).contextCorrected)
+        backlog.remove(id)
+        XCTAssertFalse(backlog.boundaries.contains { $0.id == id })
+        for char in "ext " { backlog.append(String(char)) }
+        XCTAssertFalse(try XCTUnwrap(backlog.boundaries.last).spellingCorrected)
+        XCTAssertFalse(try XCTUnwrap(backlog.boundaries.last).contextCorrected)
+        backlog.reset()
+        XCTAssertTrue(backlog.boundaries.isEmpty)
+    }
+
 }

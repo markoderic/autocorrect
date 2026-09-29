@@ -127,9 +127,9 @@ final class CorrectionPolicyTests: XCTestCase {
             XCTAssertEqual(CorrectionPolicy.preferredAutomaticReplacement(for: pair.0, systemCorrection: pair.1,
                                                                           guesses: []), expected, "\(pair)")
         }
-        // Non-vowel insertions in short words need the native automatic recommendation.
-        XCTAssertNil(CorrectionPolicy.preferredAutomaticReplacement(for: "wih", systemCorrection: nil, guesses: ["with"]))
-        XCTAssertNil(CorrectionPolicy.preferredAutomaticReplacement(for: "helo", systemCorrection: nil, guesses: ["hello"]))
+        // A uniquely closest top guess can fill a missing letter without a native recommendation.
+        XCTAssertEqual(CorrectionPolicy.preferredAutomaticReplacement(for: "wih", systemCorrection: nil, guesses: ["with"]), "with")
+        XCTAssertEqual(CorrectionPolicy.preferredAutomaticReplacement(for: "helo", systemCorrection: nil, guesses: ["hello"]), "hello")
     }
 
     func testPreferredAutomaticReplacementRetainsSafetyBoundaries() {

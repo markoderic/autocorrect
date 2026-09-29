@@ -80,11 +80,11 @@ final class EnglishWritingIntegrationTests: XCTestCase {
         XCTAssertNotEqual(engine.suggestion("ui"), "UI")
     }
 
-    func testContextPreviewRequiresApprovalAndRespectsUserChoices() {
+    func testClearContextPreviewAndUserChoices() {
         let engine = CorrectionEngine(preferences: preferences)
         XCTAssertNil(engine.suggestion(in: "lets go "))
-        XCTAssertEqual(engine.previewText(in: "lets go "), "let's go  (approval required)")
-        XCTAssertEqual(engine.previewText(in: "its a "), "it's a  (approval required)")
+        XCTAssertEqual(engine.previewText(in: "lets go "), "let's go ")
+        XCTAssertEqual(engine.previewText(in: "its a "), "it's a ")
         preferences.ignoredWords = ["lets"]
         XCTAssertNil(engine.previewText(in: "lets go "))
         preferences.checksContext = false
