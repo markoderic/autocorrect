@@ -41,7 +41,11 @@ final class AutomaticModeTests: XCTestCase {
     func testMoreNativeCorrectionsApplyAutomatically() {
         for (word, replacement) in ["finnaly": "finally", "probly": "probably", "beutifl": "beautiful",
                                     "tomoroww": "tomorrow", "buisnes": "business", "necesry": "necessary"] {
-            XCTAssertEqual(engine.suggestion(word), replacement, word)
+            let checker = NSSpellChecker.shared
+            let range = NSRange(location: 0, length: word.utf16.count)
+            let native = checker.correction(forWordRange: range, in: word, language: "en_US", inSpellDocumentWithTag: 0)
+            let guesses = checker.guesses(forWordRange: range, in: word, language: "en_US", inSpellDocumentWithTag: 0)
+            XCTAssertEqual(engine.suggestion(word), replacement, "\(word); native=\(native ?? "nil"); guesses=\(guesses ?? [])")
         }
         XCTAssertNil(engine.suggestion("homebrew"))
         XCTAssertNil(engine.suggestion("har"))
