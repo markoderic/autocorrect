@@ -27,6 +27,8 @@ final class AccuracyRegressionTests: XCTestCase {
                                     "chatgpt": "ChatGPT", "linkedin": "LinkedIn"] {
             XCTAssertEqual(engine.suggestion(in: "my \(source) "), expected, source)
         }
+        XCTAssertEqual(engine.suggestion(in: "Done. iphoen "), "iPhone")
+        XCTAssertEqual(engine.suggestion(in: "Done. iphne "), "iPhone")
         for word in ["phone", "siphon", "hub", "GitHub", "iPhone", "IPHONE", "@github", "github.com"] {
             XCTAssertNil(engine.suggestion(in: "my \(word) "), word)
         }

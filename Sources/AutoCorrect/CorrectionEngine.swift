@@ -284,6 +284,9 @@ final class CorrectionEngine {
             return Assessment(misspelled: true, replacement: builtIn, automatic: true)
         }
         let spelling = spellingAssessment(word, context: context, range: range)
+        // Product spelling is canonical even at a sentence start (iPhone, not IPhone).
+        if preferences.normalizesProductNames, let replacement = spelling.replacement,
+           BuiltInReplacements.casing.values.contains(replacement) { return spelling }
         guard preferences.capitalizesAfterPeriod, let context, let range,
               let sentence = SentenceCapitalization.candidate(in: context, caret: context.utf16.count), sentence.range == range,
               let chosen = spelling.replacement ?? (spelling.misspelled ? nil : word),
