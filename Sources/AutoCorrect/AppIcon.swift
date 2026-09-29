@@ -1,17 +1,42 @@
 import AppKit
+import CoreText
 
 /// A compact drawn mark: a lowercase a with a correction check.
 /// The menu version is a template so macOS supplies the correct contrast.
 enum AppIcon {
-    static func menuImage() -> NSImage {
-        let image = NSImage(size: NSSize(width: 23, height: 20), flipped: false) { rect in
-            drawMark(in: rect.insetBy(dx: 1, dy: 1), color: .black)
+    private static let compactMenuImage: NSImage = {
+        let image = NSImage(size: NSSize(width: 20, height: 18), flipped: false) { rect in
+            let font = NSFont.systemFont(ofSize: 15, weight: .semibold) as CTFont
+            var character: UniChar = 97
+            var glyph: CGGlyph = 0
+            guard CTFontGetGlyphsForCharacters(font, &character, &glyph, 1),
+                  let letter = CTFontCreatePathForGlyph(font, glyph, nil),
+                  let context = NSGraphicsContext.current?.cgContext else { return false }
+            let letterBounds = letter.boundingBoxOfPath
+            let check = CGMutablePath()
+            check.move(to: CGPoint(x: letterBounds.maxX + 1, y: letterBounds.minY + 3.8))
+            check.addLine(to: CGPoint(x: letterBounds.maxX + 3.4, y: letterBounds.minY + 1.3))
+            check.addLine(to: CGPoint(x: letterBounds.maxX + 8, y: letterBounds.maxY + 1.5))
+            // Center the actual ink, including the stroke, rather than a font's line box.
+            let ink = letterBounds.union(check.boundingBoxOfPath.insetBy(dx: -0.85, dy: -0.85))
+            let scale = min(16 / ink.width, 11 / ink.height)
+            context.saveGState()
+            context.translateBy(x: rect.midX - ink.midX * scale, y: rect.midY - ink.midY * scale)
+            context.scaleBy(x: scale, y: scale)
+            context.setFillColor(NSColor.black.cgColor)
+            context.addPath(letter); context.fillPath()
+            context.setStrokeColor(NSColor.black.cgColor)
+            context.setLineWidth(1.7); context.setLineCap(.round); context.setLineJoin(.round)
+            context.addPath(check); context.strokePath()
+            context.restoreGState()
             return true
         }
         image.isTemplate = true
         image.accessibilityDescription = "AutoCorrect"
         return image
-    }
+    }()
+
+    static func menuImage() -> NSImage { compactMenuImage }
 
     static func applicationImage(size: CGFloat = 128) -> NSImage {
         NSImage(size: NSSize(width: size, height: size), flipped: false) { rect in

@@ -24,6 +24,8 @@ final class CorrectionEngine {
     private var readAttempts = 0
     private var undoAnchor: CorrectionUndoAnchor?
     private var attemptedBoundaries: [UInt64: Int] = [:]
+    private var manualRewrites = ManualRewriteProtection()
+    private var rewriteField: (pid: pid_t, element: AXUIElement, id: UUID)?
     private let spellDocument = NSSpellChecker.uniqueSpellDocumentTag()
     private struct Assessment {
         let misspelled: Bool
@@ -38,7 +40,10 @@ final class CorrectionEngine {
     init(preferences: Preferences) {
         self.preferences = preferences
         monitor.onKey = { [weak self] text, flags, key in self?.key(text, flags: flags, keyCode: key) }
-        monitor.onMouse = { [weak self] in self?.resetTyping(); self?.indicator.hide() }
+        monitor.onMouse = { [weak self] in
+            self?.manualRewrites.noteManualEdit(now: ProcessInfo.processInfo.systemUptime)
+            self?.resetTyping(); self?.indicator.hide()
+        }
         monitor.onUndo = { [weak self] in
             guard let self, self.undoProposal != nil, !self.inFlight else { return false }
             DispatchQueue.main.async { self.undo() }
@@ -76,6 +81,8 @@ final class CorrectionEngine {
 
     func invalidate() {
         resetTyping()
+        manualRewrites.reset()
+        rewriteField = nil
         pending = nil
         undoProposal = nil
         undoAnchor = nil
@@ -96,6 +103,9 @@ final class CorrectionEngine {
     }
 
     private func key(_ text: String?, flags: CGEventFlags, keyCode: Int64) {
+        if [51, 117].contains(keyCode) || (keyCode == 6 && flags.contains(.maskCommand) && !flags.contains(.maskShift)) {
+            manualRewrites.noteManualEdit(now: ProcessInfo.processInfo.systemUptime)
+        }
         cancelScheduled()
         let hadProposal = pending != nil || flaggedWord != nil
         pending = nil
@@ -147,7 +157,8 @@ final class CorrectionEngine {
             }
             guard let candidate = candidate(in: completed),
                   snapshot.windowStart == 0 || candidate.range.location > 0,
-                  !preferences.ignoredWords.contains(UserDictionary.normalizedKey(candidate.original)) else {
+                  !preferences.ignoredWords.contains(UserDictionary.normalizedKey(candidate.original)),
+                  !isManualRewrite(candidate, snapshot: snapshot) else {
                 backlog.remove(boundary.id)
                 continue
             }
@@ -171,7 +182,8 @@ final class CorrectionEngine {
             return
         }
         if pending == nil, let contextual = contextualCandidate(in: snapshot.text),
-           snapshot.windowStart == 0 || contextual.range.location > 0 {
+           snapshot.windowStart == 0 || contextual.range.location > 0,
+           !isManualRewrite(CorrectionCandidate(original: contextual.original, range: contextual.range), snapshot: snapshot) {
             showSuggestion(Proposal(snapshot: snapshot, range: contextual.range, original: contextual.original,
                                     replacement: contextual.replacement, created: Date()))
         }
@@ -182,6 +194,20 @@ final class CorrectionEngine {
         readAttempts += 1
         scheduleCheck(delay: 40)
         return true
+    }
+
+    private func rewriteFieldID(for snapshot: AccessibilityText.Snapshot) -> UUID {
+        if let field = rewriteField, field.pid == snapshot.pid, CFEqual(field.element, snapshot.element) { return field.id }
+        manualRewrites.reset()
+        let id = UUID()
+        rewriteField = (snapshot.pid, snapshot.element, id)
+        return id
+    }
+
+    private func isManualRewrite(_ candidate: CorrectionCandidate, snapshot: AccessibilityText.Snapshot) -> Bool {
+        let field = rewriteFieldID(for: snapshot)
+        return manualRewrites.suppresses(field: field, candidate: candidate, text: snapshot.text,
+                                        windowStart: snapshot.windowStart, now: ProcessInfo.processInfo.systemUptime)
     }
 
     private func contextualCandidate(in text: String) -> ContextualWritingCandidate? {
@@ -267,9 +293,10 @@ final class CorrectionEngine {
         if misspelled.location != NSNotFound {
             let proposed = checker.correction(forWordRange: wordRange, in: text, language: preferences.language, inSpellDocumentWithTag: spellDocument)
             let guesses = checker.guesses(forWordRange: wordRange, in: text, language: preferences.language, inSpellDocumentWithTag: spellDocument) ?? []
-            let confident = CorrectionPolicy.preferredAutomaticReplacement(for: word, systemCorrection: proposed, guesses: guesses)
+            let preserveCompound = CompoundSpellingPolicy.prefersUnchangedLetters(for: word, guesses: guesses)
+            let confident = preserveCompound ? nil : CorrectionPolicy.preferredAutomaticReplacement(for: word, systemCorrection: proposed, guesses: guesses)
             // Dictionary guesses can cover larger mistakes, but never apply them without approval.
-            let review = confident ?? proposed ?? guesses.first
+            let review = preserveCompound ? guesses.first : (confident ?? proposed ?? guesses.first)
             answer = Assessment(misspelled: true, replacement: review, automatic: confident != nil)
         }
         if cache.count >= 256 { cache.removeAll(keepingCapacity: true) }
@@ -302,12 +329,22 @@ final class CorrectionEngine {
         inFlight = true
         let epoch = sessionEpoch
         let ticket = generation
+        var protectionID: UUID?
         monitor.replace(plan, validate: { [weak self] in
             guard let self, self.generation == ticket, self.preferences.enabled,
                   KeyboardMonitor.safeInputSource,
                   let bundle = NSRunningApplication(processIdentifier: proposal.snapshot.pid)?.bundleIdentifier,
                   !self.preferences.excludedApps.contains(bundle) else { return false }
-            return AccessibilityText.stillMatches(proposal.snapshot)
+            guard AccessibilityText.stillMatches(proposal.snapshot) else { return false }
+            let field = self.rewriteFieldID(for: proposal.snapshot)
+            if isUndo {
+                self.manualRewrites.noteManualEdit(now: ProcessInfo.processInfo.systemUptime)
+            } else {
+                protectionID = self.manualRewrites.recordPostedCorrection(field: field, text: proposal.snapshot.text,
+                    windowStart: proposal.snapshot.windowStart, range: proposal.range, replacement: proposal.replacement,
+                    now: ProcessInfo.processInfo.systemUptime)
+            }
+            return true
         }, completion: { [weak self] posted in
             guard let self, self.sessionEpoch == epoch else { return }
             guard posted else {
@@ -323,20 +360,21 @@ final class CorrectionEngine {
             if let boundaryID { self.backlog.remove(boundaryID); self.attemptedBoundaries.removeValue(forKey: boundaryID) }
             if isUndo { self.undoProposal = nil; self.undoAnchor = nil }
             // A posted edit is never repeated, even if the editor is slow to confirm it.
-            self.verify(proposal, plan: plan, epoch: epoch, isUndo: isUndo, andIgnore: andIgnore, attempt: 0)
+            self.verify(proposal, plan: plan, epoch: epoch, isUndo: isUndo, andIgnore: andIgnore, protectionID: protectionID, attempt: 0)
         })
     }
 
     private func verify(_ proposal: Proposal, plan: KeyboardReplacementPlan, epoch: UInt64,
-                        isUndo: Bool, andIgnore: Bool, attempt: Int) {
+                        isUndo: Bool, andIgnore: Bool, protectionID: UUID?, attempt: Int) {
         DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(attempt == 0 ? 40 : 100)) { [weak self] in
             guard let self, self.sessionEpoch == epoch else { return }
             guard AccessibilityText.verifies(snapshot: proposal.snapshot, expectedText: plan.expectedText, expectedCaret: plan.expectedCaret) else {
                 if attempt < 2 {
-                    self.verify(proposal, plan: plan, epoch: epoch, isUndo: isUndo, andIgnore: andIgnore, attempt: attempt + 1)
+                    self.verify(proposal, plan: plan, epoch: epoch, isUndo: isUndo, andIgnore: andIgnore, protectionID: protectionID, attempt: attempt + 1)
                 } else {
                     self.inFlight = false
                     self.backlog.reset()
+                    if let protectionID { self.manualRewrites.remove(protectionID) }
                     RuntimeDiagnostics.record("correction unconfirmed")
                     self.status = "Editor did not confirm correction"
                     self.onChange?()

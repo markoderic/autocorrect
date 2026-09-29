@@ -1,3 +1,16 @@
+# 0.3.1 validation
+
+Checked September 29, 2026 on Apple silicon, macOS 26.6, Swift 6.4.
+
+- **105 tests passed, zero failures**, including manual rewrite loops, alternate manual spellings, unchanged/different occurrences, field/context mismatches, canceled/unconfirmed edits, native-undo edit signals, confirmed-override retention, bounded history eviction, and compound-word ranking. The event-tap placement was also independently reviewed for registration-before-posting and lifecycle safety. Tests exercise the policy and actual engine assessment; they do not simulate physical typing in every editor.
+- Manual rewrite protection remembers at most eight recent correction occurrences in the active field. A deletion, native undo, or mouse edit followed by changed spelling at the same exact location/context protects that occurrence. Confirmed overrides persist until field/settings reset or bounded-history eviction. Unconfirmed records expire after two minutes. No permanent ignored-word preference is written.
+- The installed engine reports `homebrew → (unchanged)`, while `teh → the`, `idk → I don't know`, `iphone → iPhone`, `ui → UI`, and `capitazed → capitalized` still pass. A generic native compound suggestion rule prevents replacing identical joined letters with a different word. It can still offer the spaced form for review.
+- The new menu image is 20×18 points. A 2× native raster measures 40×36 pixels, with visible bounds x=4…35 and y=7…28: the mark is centered on both axes and occupies about 16×11 points. The application icon is unchanged.
+- Universal arm64/x86_64 release build and strict signature verification passed. Archive: 1,471,501 bytes; SHA-256 `af8f127bb9f7b81e6eb8cb171ebbe80c5a8e3166e2f3119c76e63ebafb0e9b0e`. Installed Accessibility, Input Monitoring, keyboard listener, keyboard layout, and launch-at-login registration remain enabled. The app runs without trace logging.
+- Created an 18-second 1280×720, 24 fps MP4 with Higgsfield/Higgsedit, plus an 800×450 looping GIF and poster. Main frames were visually inspected. All visuals are authored examples and labeled **Illustrated demo**, not a real editor recording or compatibility test. The editable composition and assets are in `docs/media/`. A LinkedIn draft is kept outside tracked source under ignored `dist/launch/`; nothing was sent or posted to LinkedIn.
+
+---
+
 # 0.3.0 validation
 
 Checked September 29, 2026 on Apple silicon, macOS 26.6, Swift 6.4.

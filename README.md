@@ -4,7 +4,11 @@ A small native macOS menu bar app that corrects spelling when you finish typing 
 
 Requires **macOS 13 Ventura or later**, on Apple silicon or Intel.
 
-**0.3.0 is a preview.** Unit tests, universal packaging, local launch, and login registration have been checked. Compatibility with individual editors and underline placement still need real keyboard testing; see [validation](docs/VALIDATION.md).
+**0.3.1 is a preview.** Unit tests, universal packaging, local launch, and login registration have been checked. Compatibility with individual editors and underline placement still need real keyboard testing; see [validation](docs/VALIDATION.md).
+
+![Illustrated AutoCorrect demo](docs/media/autocorrect-demo.gif)
+
+[Watch the 18-second video](docs/media/autocorrect-demo.mp4) · Illustrated demo, not a screen recording.
 
 ## What it does
 
@@ -13,7 +17,8 @@ Requires **macOS 13 Ventura or later**, on Apple silicon or Intel.
 - **Automatic mode:** replaces a misspelled word after a supported word boundary, such as a space.
 - **Approval mode:** offers a correction through the menu bar so you can decide whether to apply it. Suggestions expire after 30 seconds and are canceled by your next key press.
 - Undo the most recent correction with **Control–Option–Command–Z** or the menu bar, even after continuing to type. Undo lasts up to five minutes while the unchanged correction and its context remain within the bounded text window (up to 96 ASCII characters after it). It restores the original word or abbreviation and preserves following text. It does not replace your editor’s Command–Z.
-- A custom letter/checkmark menu bar icon and a native app window with Overview, Writing, Text Replacements, Ignored Words, and Apps. To pause one app, open that app, then choose **AutoCorrect → Pause in [app]**. Choose **Resume in [app]** to turn it back on. The Paused Apps submenu only lists apps installed on your Mac.
+- When you delete or manually rewrite a recent correction, AutoCorrect respects the changed spelling at that same position in the current text field. It does not silently add it to a global dictionary. Use Ignored Words for a permanent exception.
+- A compact, vertically centered letter/checkmark menu bar icon and a native app window with Overview, Writing, Text Replacements, Ignored Words, and Apps. To pause one app, open that app, then choose **AutoCorrect → Pause in [app]**. Choose **Resume in [app]** to turn it back on. The Paused Apps submenu only lists apps installed on your Mac.
 - **Settings → Ignored Words:** add names or words that should never be corrected or marked. Remove a word to check it again. Matching ignores capitalization.
 - **Settings → Text Replacements:** choose a typed shortcut and its replacement phrase (up to 120 characters), including exact capitalization. Add the same typed word again to update it. Ignored words take precedence over custom corrections.
 - **Settings → Writing → Capitalize after a period:** enabled by default. Capitalizes the next completed word when you type its space or punctuation (`Done. hello ` → `Done. Hello `). Turn it off independently of spelling correction. Common abbreviations, initials, decimals, URLs, and ambiguous period endings are skipped. Ignored words and exact custom replacements keep priority.
@@ -23,11 +28,11 @@ Requires **macOS 13 Ventura or later**, on Apple silicon or Intel.
 - Uses read-only macOS Accessibility to check the field, then native keyboard input to correct it without temporarily selecting the word.
 - Runs in the background without a Dock icon. Settings opens only when requested.
 
-This release handles **spelling, text expansion, capitalization, and a narrow set of contextual English suggestions**. It does not provide comprehensive grammar, tone, or rewriting. Apple's dictionaries cover common and uncommon words, but are not an exhaustive list of every English word, name, or technical term. Short missing-letter typos now use native-ranked suggestions too: for example, `ths → this` and `frm → from`. Longer misspellings can use the first native-ranked guess, with edit-distance and ambiguity checks (`capitazed → capitalized` on the development Mac). These are general edit rules, not a fixed list of typos; ambiguous words can still be wrong or left unchanged. A misspelling without a reliable automatic correction is flagged for review when supported; no correction is guaranteed for every word.
+This release handles **spelling, text expansion, capitalization, and a narrow set of contextual English suggestions**. It does not provide comprehensive grammar, tone, or rewriting. Apple's dictionaries cover common and uncommon words, but are not an exhaustive list of every English word, name, or technical term. Short missing-letter typos now use native-ranked suggestions too: for example, `ths → this` and `frm → from`. Longer misspellings can use the first native-ranked guess, with edit-distance and ambiguity checks (`capitazed → capitalized` on the development Mac). These are general edit rules, not a fixed list of typos; ambiguous words can still be wrong or left unchanged. If the native top suggestion only separates the exact typed letters with a space or hyphen, the app offers that for review instead of automatically substituting a different word (`homebrew` no longer automatically becomes `homebred`). A misspelling without a reliable automatic correction is flagged for review when supported; no correction is guaranteed for every word.
 
 ## Install
 
-Download `AutoCorrect-0.3.0-universal.zip` from [Releases](https://github.com/markoderic/autocorrect/releases), unzip it, and move **AutoCorrect.app** to **Applications**. Open it and look for its menu bar item.
+Download `AutoCorrect-0.3.1-universal.zip` from [Releases](https://github.com/markoderic/autocorrect/releases), unzip it, and move **AutoCorrect.app** to **Applications**. Open it and look for its menu bar item.
 
 Release builds are **ad-hoc signed and not Apple notarized**. macOS may block the first launch of a downloaded copy. If you trust the source, attempt to open the app, then go to **System Settings → Privacy & Security → Open Anyway** and confirm. Follow the macOS instructions shown for your version. You do not need to disable Gatekeeper.
 
@@ -78,8 +83,8 @@ The build script compiles **arm64 and x86_64**, combines them into a universal e
 
 ```text
 dist/AutoCorrect.app
-dist/AutoCorrect-0.3.0-universal.zip
-dist/AutoCorrect-0.3.0-universal.zip.sha256
+dist/AutoCorrect-0.3.1-universal.zip
+dist/AutoCorrect-0.3.1-universal.zip.sha256
 ```
 
 It can be called from any working directory. The installer uses `/Applications` when writable, otherwise `~/Applications`. Use `--user` to choose `~/Applications`, `--no-open` to install without launching, and `--replace` to replace an existing installation. Quit AutoCorrect before replacing it; the installer preserves the previous bundle alongside the new one.
