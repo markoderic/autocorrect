@@ -4,29 +4,33 @@ A small native macOS menu bar app that corrects spelling when you finish typing 
 
 Requires **macOS 13 Ventura or later**, on Apple silicon or Intel.
 
-**0.1.0 is an initial preview.** Unit tests, universal packaging, local launch, and login registration have been checked. Real typing across other apps still needs permission-enabled testing; see [validation](docs/VALIDATION.md).
+**0.2.0 is a preview.** Unit tests, universal packaging, local launch, and login registration have been checked. Real typing and underline placement across other apps still need permission-enabled testing; see [validation](docs/VALIDATION.md).
 
 ## What it does
 
 - **Automatic mode:** replaces a misspelled word after a supported word boundary, such as a space.
 - **Approval mode:** offers a correction through the menu bar so you can decide whether to apply it. Suggestions expire after 30 seconds and are canceled by your next key press.
 - Undo the most recent correction from the menu bar immediately, before your next key press or the 30-second timeout.
-- Pause correction, exclude individual apps, choose a spelling language, and manage ignored words from the menu bar.
+- A simple **Aa** menu bar icon. To pause one app, open that app, then choose **Aa → Pause in [app]**. Choose **Resume in [app]** to turn it back on. The Paused Apps submenu only lists apps installed on your Mac.
+- **Settings → Ignored Words:** add names or words that should never be corrected or marked. Remove a word to check it again. Matching ignores capitalization.
+- **Settings → Custom Corrections:** choose a typed word and its replacement, including exact capitalization. Add the same typed word again to update it. Ignored words take precedence over custom corrections.
+- **Show Spelling Underlines:** optionally draw a red wavy underline beneath the latest completed possible misspelling. This requires the host app to expose the word's on-screen bounds. It clears on typing, clicking, scrolling, app switching, or after five seconds. It does not continuously mark the whole document.
+- English (US) is the default; the language selector is in Settings. Uncertain dictionary suggestions require approval even in automatic mode.
 - Automatically requests launch at login on first launch; you can turn it off in the menu bar.
 - Works in compatible text fields across native and browser apps through macOS Accessibility.
-- Runs in the background without a Dock icon or a main window.
+- Runs in the background without a Dock icon. Settings opens only when requested.
 
-This first release handles **spelling**, not grammar, tone, or rewriting. A spell checker can choose the wrong word; use approval mode when that would be disruptive.
+This release handles **spelling**, not grammar, tone, or rewriting. Apple's dictionaries cover common and uncommon words, but are not an exhaustive list of every English word, name, or technical term. A misspelling without a reliable automatic correction is flagged for review when supported; no correction is guaranteed for every word.
 
 ## Install
 
-Download `AutoCorrect-0.1.0-universal.zip` from [Releases](https://github.com/markoderic/autocorrect/releases), unzip it, and move **AutoCorrect.app** to **Applications**. Open it and look for its menu bar item.
+Download `AutoCorrect-0.2.0-universal.zip` from [Releases](https://github.com/markoderic/autocorrect/releases), unzip it, and move **AutoCorrect.app** to **Applications**. Open it and look for its menu bar item.
 
 Release builds are **ad-hoc signed and not Apple notarized**. macOS may block the first launch of a downloaded copy. If you trust the source, attempt to open the app, then go to **System Settings → Privacy & Security → Open Anyway** and confirm. Follow the macOS instructions shown for your version. You do not need to disable Gatekeeper.
 
 ### Permissions
 
-Open the app's menu and grant the permissions it requests in **System Settings → Privacy & Security**:
+Open **Aa → Permissions** and grant the permissions it requests in **System Settings → Privacy & Security**:
 
 1. **Accessibility:** lets AutoCorrect inspect the focused text field and replace the completed word.
 2. **Input Monitoring:** lets AutoCorrect notice word boundaries while you type in another app.
@@ -71,8 +75,8 @@ The build script compiles **arm64 and x86_64**, combines them into a universal e
 
 ```text
 dist/AutoCorrect.app
-dist/AutoCorrect-0.1.0-universal.zip
-dist/AutoCorrect-0.1.0-universal.zip.sha256
+dist/AutoCorrect-0.2.0-universal.zip
+dist/AutoCorrect-0.2.0-universal.zip.sha256
 ```
 
 It can be called from any working directory. The installer uses `/Applications` when writable, otherwise `~/Applications`. Use `--user` to choose `~/Applications`, `--no-open` to install without launching, and `--replace` to replace an existing installation. Quit AutoCorrect before replacing it; the installer preserves the previous bundle alongside the new one.

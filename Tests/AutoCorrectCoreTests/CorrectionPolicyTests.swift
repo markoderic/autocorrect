@@ -75,4 +75,27 @@ final class CorrectionPolicyTests: XCTestCase {
     func testCanonicalEquivalentSpellingIsNotChanged() {
         XCTAssertNil(CorrectionPolicy.confidentReplacement(for: "cafe\u{301}", suggestion: "café"))
     }
+
+    func testExplicitCustomCorrectionsAllowUnusualCase() throws {
+        let dictionary = try UserDictionary.parse(ignoredText: "", correctionsText: "chAt -> Chat\nteh -> The\nCAFÉ -> Café")
+        let exceptions = Set(dictionary.corrections.keys)
+        for word in ["chAt", "TEH", "CAFE\u{301}"] {
+            let text = word + " "
+            XCTAssertNil(candidate(text))
+            let result = CorrectionPolicy.candidate(in: text, caret: text.utf16.count, caseExceptions: exceptions)
+            XCTAssertEqual(result?.original, word)
+            XCTAssertNotNil(dictionary.corrections[UserDictionary.normalizedKey(result!.original)])
+        }
+        XCTAssertNil(CorrectionPolicy.candidate(in: "OTHER ", caret: 6, caseExceptions: exceptions))
+    }
+
+    func testCaseExceptionsDoNotBypassStructuredTokenOrLengthRules() {
+        for word in ["https://EXAMPLE.com", "USER@example.com", "obj.TEH", "snake_CASE", "/tmp/TEH", "TEH123", "A", String(repeating: "A", count: 33)] {
+            let text = word + " "
+            XCTAssertNil(CorrectionPolicy.candidate(in: text, caret: text.utf16.count,
+                                                   caseExceptions: [UserDictionary.normalizedKey(word)]), word)
+        }
+        XCTAssertNil(CorrectionPolicy.candidate(in: "TEH\n", caret: 4, caseExceptions: ["teh"]))
+        XCTAssertNil(CorrectionPolicy.candidate(in: "TEH ", caret: 99, caseExceptions: ["teh"]))
+    }
 }

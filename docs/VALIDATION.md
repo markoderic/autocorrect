@@ -1,3 +1,18 @@
+# 0.2.0 validation
+
+Checked September 29, 2026 on Apple silicon, macOS 26.6, Swift 6.4.
+
+- 21 core tests passed, 0 failed: original correction policy, Unicode/case handling, dictionary parsing and validation, custom-source case exceptions, and preservation of structured-token protections.
+- Universal arm64/x86_64 release built and signed successfully. Installed update passes strict signature verification.
+- Native Settings window visually inspected. English (US) selected by default; underline toggle enabled; approval toggle off.
+- Real UI test added an ignored word and a custom correction, saved them, relaunched, and confirmed both persisted with exact replacement casing. Both temporary entries were removed through the UI and empty saved lists were verified afterward.
+- Native spelling smoke checks passed for teh, helllo, recieve, and speling; world, Marko, and GitHub unchanged.
+- Accessibility and Input Monitoring both report false on this installation. Actual cross-app correction, menu approval, undo, and red underline placement remain unverified until the user grants access. The overlay's code compiles; compilation is not a visual placement test.
+- Underlines are transient, apply to the most recently completed word, and require usable AX bounds. They are not persistent full-document markings.
+- No complete inventory of English words is bundled or claimed; the app consults Apple's local spelling dictionaries. Uncertain suggestions require review. User-specified replacements preserve exact spelling; ignored words take precedence.
+
+---
+
 # 0.1.0 validation
 
 Checked September 28, 2026 on Apple silicon, macOS 26.6, Swift 6.4 / Xcode 27 SDK.

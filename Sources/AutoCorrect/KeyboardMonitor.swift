@@ -11,7 +11,7 @@ final class KeyboardMonitor {
     func start() -> Bool {
         if isRunning { return true }
         stop()
-        let mask = (1 << CGEventType.keyDown.rawValue) | (1 << CGEventType.leftMouseDown.rawValue) | (1 << CGEventType.rightMouseDown.rawValue)
+        let mask = (1 << CGEventType.keyDown.rawValue) | (1 << CGEventType.leftMouseDown.rawValue) | (1 << CGEventType.rightMouseDown.rawValue) | (1 << CGEventType.scrollWheel.rawValue)
         // An active tap on this run loop holds subsequent key/mouse delivery while the
         // short, timeout-bounded AX replacement runs. Every event is returned unchanged.
         guard let tap = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .tailAppendEventTap, options: .defaultTap, eventsOfInterest: CGEventMask(mask), callback: { _, type, event, context in

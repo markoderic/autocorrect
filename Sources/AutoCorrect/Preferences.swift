@@ -14,6 +14,14 @@ final class Preferences {
         get { defaults.string(forKey: "language") ?? "en_US" }
         set { defaults.set(newValue, forKey: "language") }
     }
+    var showsSpellingIndicators: Bool {
+        get { defaults.object(forKey: "showsSpellingIndicators") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "showsSpellingIndicators") }
+    }
+    var customCorrections: [String: String] {
+        get { defaults.dictionary(forKey: "customCorrections") as? [String: String] ?? [:] }
+        set { defaults.set(newValue, forKey: "customCorrections") }
+    }
     var ignoredWords: Set<String> {
         get { Set(defaults.stringArray(forKey: "ignoredWords") ?? []) }
         set { defaults.set(newValue.sorted(), forKey: "ignoredWords") }

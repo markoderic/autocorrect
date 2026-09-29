@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
-VERSION="${VERSION:-0.1.0}"
+VERSION="${VERSION:-0.2.0}"
 SIGNING_IDENTITY="${SIGNING_IDENTITY:--}"
 APP="$ROOT/dist/AutoCorrect.app"
 
@@ -15,7 +15,7 @@ for command in swift xcrun codesign ditto; do
   command -v "$command" >/dev/null || { echo "error: missing $command. Install Xcode Command Line Tools." >&2; exit 1; }
 done
 [[ -f Package.swift ]] || { echo "error: Package.swift is missing from $ROOT." >&2; exit 1; }
-[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "error: VERSION must have the form 0.1.0." >&2; exit 1; }
+[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "error: VERSION must have the form 0.2.0." >&2; exit 1; }
 
 mkdir -p "$ROOT/dist"
 STAGING="$(mktemp -d "${TMPDIR:-/tmp}/autocorrect-build.XXXXXX")"

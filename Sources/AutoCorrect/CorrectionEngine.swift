@@ -13,19 +13,26 @@ final class CorrectionEngine {
     var onChange: (() -> Void)?
     private(set) var pending: Proposal?
     private(set) var undoProposal: Proposal?
+    private(set) var flaggedWord: String?
     private(set) var correctionCount = 0
     private(set) var status = "Ready"
     private var generation: UInt64 = 0
     private var work: DispatchWorkItem?
     private let spellDocument = NSSpellChecker.uniqueSpellDocumentTag()
-    private var cache: [String: String] = [:]
+    private struct Assessment {
+        let misspelled: Bool
+        let replacement: String?
+        let automatic: Bool
+    }
+    private var cache: [String: Assessment] = [:]
+    private let indicator = SpellingIndicator()
     private let monitor = KeyboardMonitor()
     var isRunning: Bool { monitor.isRunning }
 
     init(preferences: Preferences) {
         self.preferences = preferences
         monitor.onKey = { [weak self] text, flags, key in self?.key(text, flags: flags, keyCode: key) }
-        monitor.onMouse = { [weak self] in self?.cancelScheduled() }
+        monitor.onMouse = { [weak self] in self?.cancelScheduled(); self?.indicator.hide() }
     }
 
     func refresh() {
@@ -48,14 +55,18 @@ final class CorrectionEngine {
         cancelScheduled()
         pending = nil
         undoProposal = nil
+        flaggedWord = nil
+        indicator.hide()
         if monitor.isRunning { status = "Ready" }
     }
 
     private func key(_ text: String?, flags: CGEventFlags, keyCode: Int64) {
         cancelScheduled()
-        let hadProposal = pending != nil || undoProposal != nil
+        let hadProposal = pending != nil || undoProposal != nil || flaggedWord != nil
         pending = nil
         undoProposal = nil
+        flaggedWord = nil
+        indicator.hide()
         if hadProposal { status = "Ready"; onChange?() }
         guard preferences.enabled, !flags.contains(.maskCommand), !flags.contains(.maskControl), !flags.contains(.maskAlternate),
               ![36, 48, 76].contains(keyCode), // Return and Tab can submit or change fields.
@@ -77,15 +88,24 @@ final class CorrectionEngine {
               app.processIdentifier != ProcessInfo.processInfo.processIdentifier,
               let bundleID = app.bundleIdentifier, !preferences.excludedApps.contains(bundleID),
               let snapshot = AccessibilityText.snapshot(pid: app.processIdentifier),
-              let candidate = CorrectionPolicy.candidate(in: snapshot.text, caret: (snapshot.text as NSString).length),
+              let candidate = CorrectionPolicy.candidate(in: snapshot.text, caret: (snapshot.text as NSString).length, caseExceptions: Set(preferences.customCorrections.keys)),
               // A clipped window must not turn the end of an identifier into an apparent whole word.
               snapshot.windowStart == 0 || candidate.range.location > 0,
-              !preferences.ignoredWords.contains(candidate.original.lowercased()),
-              let replacement = suggestion(candidate.original) else { return }
+              !preferences.ignoredWords.contains(UserDictionary.normalizedKey(candidate.original)) else { return }
+        let result = assessment(candidate.original)
+        guard result.misspelled else { return }
+        flaggedWord = candidate.original
+        guard let replacement = result.replacement else {
+            status = "Possible misspelling: \(candidate.original)"
+            if preferences.showsSpellingIndicators { indicator.show(snapshot: snapshot, range: candidate.range) }
+            onChange?()
+            return
+        }
         let proposal = Proposal(snapshot: snapshot, range: candidate.range, original: candidate.original, replacement: replacement, created: Date())
-        if preferences.asksBeforeCorrecting {
+        if preferences.asksBeforeCorrecting || !result.automatic {
             pending = proposal
             status = "Suggestion ready"
+            if preferences.showsSpellingIndicators { indicator.show(snapshot: snapshot, range: candidate.range) }
             onChange?()
         } else {
             apply(proposal)
@@ -93,17 +113,31 @@ final class CorrectionEngine {
     }
 
     func suggestion(_ word: String) -> String? {
+        let result = assessment(word)
+        return result.misspelled && result.automatic ? result.replacement : nil
+    }
+
+    private func assessment(_ word: String) -> Assessment {
+        let normalized = UserDictionary.normalizedKey(word)
+        if preferences.ignoredWords.contains(normalized) { return Assessment(misspelled: false, replacement: nil, automatic: false) }
+        if let custom = preferences.customCorrections[normalized] {
+            return Assessment(misspelled: custom != word, replacement: custom, automatic: true)
+        }
         let key = preferences.language + ":" + word
-        if let value = cache[key] { return value.isEmpty ? nil : value }
+        if let value = cache[key] { return value }
         let checker = NSSpellChecker.shared
         let misspelled = checker.checkSpelling(of: word, startingAt: 0, language: preferences.language, wrap: false, inSpellDocumentWithTag: spellDocument, wordCount: nil)
-        var answer: String?
-        if misspelled.location != NSNotFound,
-           let proposed = checker.correction(forWordRange: NSRange(location: 0, length: (word as NSString).length), in: word, language: preferences.language, inSpellDocumentWithTag: spellDocument) {
-            answer = CorrectionPolicy.confidentReplacement(for: word, suggestion: proposed)
+        var answer = Assessment(misspelled: false, replacement: nil, automatic: false)
+        if misspelled.location != NSNotFound {
+            let wordRange = NSRange(location: 0, length: (word as NSString).length)
+            let proposed = checker.correction(forWordRange: wordRange, in: word, language: preferences.language, inSpellDocumentWithTag: spellDocument)
+            let confident = proposed.flatMap { CorrectionPolicy.confidentReplacement(for: word, suggestion: $0) }
+            // Dictionary guesses can cover larger mistakes, but never apply them without approval.
+            let review = confident ?? proposed ?? checker.guesses(forWordRange: wordRange, in: word, language: preferences.language, inSpellDocumentWithTag: spellDocument)?.first
+            answer = Assessment(misspelled: true, replacement: review, automatic: confident != nil)
         }
         if cache.count >= 256 { cache.removeAll(keepingCapacity: true) }
-        cache[key] = answer ?? ""
+        cache[key] = answer
         return answer
     }
 
@@ -114,6 +148,8 @@ final class CorrectionEngine {
     }
 
     private func apply(_ proposal: Proposal) {
+        indicator.hide()
+        flaggedWord = nil
         guard preferences.enabled, monitor.isRunning, Date().timeIntervalSince(proposal.created) < 30,
               KeyboardMonitor.safeInputSource,
               let bundle = NSRunningApplication(processIdentifier: proposal.snapshot.pid)?.bundleIdentifier,
@@ -145,15 +181,17 @@ final class CorrectionEngine {
             return
         }
         correctionCount = max(0, correctionCount - 1)
-        if andIgnore { preferences.ignoredWords.insert(proposal.replacement.lowercased()) }
+        if andIgnore { preferences.ignoredWords.insert(UserDictionary.normalizedKey(proposal.replacement)) }
         status = "Correction undone"
         onChange?()
     }
 
     func ignorePendingWord() {
-        guard let pending = pending else { return }
-        preferences.ignoredWords.insert(pending.original.lowercased())
+        guard let word = pending?.original ?? flaggedWord else { return }
+        preferences.ignoredWords.insert(UserDictionary.normalizedKey(word))
         self.pending = nil
+        flaggedWord = nil
+        indicator.hide()
         status = "Word ignored"
         onChange?()
     }

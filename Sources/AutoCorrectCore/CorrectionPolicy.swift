@@ -22,7 +22,9 @@ public enum CorrectionPolicy {
     /// Finds a complete word just before `caret`, expressed as a UTF-16 offset in `text`.
     /// Callers must separately require an empty selection and revalidate the focused field
     /// and its value immediately before applying a replacement. Invalid offsets return nil.
-    public static func candidate(in text: String, caret: Int) -> CorrectionCandidate? {
+    /// `caseExceptions` contains explicit custom correction keys normalized with
+    /// `UserDictionary.normalizedKey`. Only the capitalization rule is relaxed for them.
+    public static func candidate(in text: String, caret: Int, caseExceptions: Set<String> = []) -> CorrectionCandidate? {
         guard caret > 0, caret <= text.utf16.count,
               let caretRange = Range(NSRange(location: caret, length: 0), in: text) else {
             return nil
@@ -60,7 +62,8 @@ public enum CorrectionPolicy {
         }
         guard start < end else { return nil }
         let word = String(prefix[start..<end])
-        guard isPlainWord(word), hasSafeCase(word) else { return nil }
+        guard isPlainWord(word),
+              hasSafeCase(word) || caseExceptions.contains(UserDictionary.normalizedKey(word)) else { return nil }
         return CorrectionCandidate(original: word, range: NSRange(start..<end, in: text))
     }
 

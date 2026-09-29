@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem!
     private let menu = NSMenu()
     private var workspaceObserver: NSObjectProtocol?
+    private lazy var settings = SettingsController(preferences: preferences) { [weak self] in self?.engine.refresh() }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -28,6 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             } catch { /* Menu exposes actual status and allows retry; app still runs normally. */ }
         }
         rebuildMenu()
+        if CommandLine.arguments.contains("--settings") { showSettings() }
         // A one-time system prompt only; permissions are always granted by the user in Settings.
         if !UserDefaults.standard.bool(forKey: "didRequestAccessibility") {
             UserDefaults.standard.set(true, forKey: "didRequestAccessibility")
@@ -45,10 +47,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func updateIcon() {
-        let symbol = !preferences.enabled ? "text.badge.minus" : engine.pending != nil ? "text.badge.plus" : "text.badge.checkmark"
-        statusItem?.button?.image = NSImage(systemSymbolName: symbol, accessibilityDescription: "AutoCorrect")
-        statusItem?.button?.image?.isTemplate = true
-        statusItem?.button?.title = preferences.enabled && !engine.isRunning ? "!" : engine.pending != nil ? "1" : ""
+        statusItem?.button?.image = nil
+        statusItem?.button?.title = "Aa"
+        statusItem?.button?.font = .systemFont(ofSize: 13, weight: .medium)
+        statusItem?.button?.alphaValue = preferences.enabled ? 1 : 0.45
+        statusItem?.button?.setAccessibilityLabel("AutoCorrect")
         statusItem?.button?.toolTip = "AutoCorrect — \(engine.status)"
     }
 
@@ -78,49 +81,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             item("Undo: \(proposal.original) → \(proposal.replacement)", action: #selector(undo))
             item("Undo & Always Ignore “\(proposal.replacement)”", action: #selector(undoAndIgnore))
         }
-        item("\(engine.correctionCount) correction\(engine.correctionCount == 1 ? "" : "s") this session")
+        if engine.pending == nil, let word = engine.flaggedWord {
+            item("No confident correction for “\(word)”")
+            item("Always Ignore “\(word)”", action: #selector(ignoreWord))
+        }
         menu.addItem(.separator())
+        item("Show Spelling Underlines", action: #selector(toggleUnderlines), checked: preferences.showsSpellingIndicators)
         if let app = NSWorkspace.shared.frontmostApplication, let bundleID = app.bundleIdentifier, bundleID != Bundle.main.bundleIdentifier {
-            let entry = item("Pause in \(app.localizedName ?? bundleID)", action: #selector(toggleApp(_:)), checked: preferences.excludedApps.contains(bundleID))
+            let paused = preferences.excludedApps.contains(bundleID)
+            let entry = item("\(paused ? "Resume" : "Pause") in \(app.localizedName ?? "This App")", action: #selector(toggleApp(_:)))
             entry.representedObject = bundleID
         }
         let exclusions = NSMenu()
         for bundle in preferences.excludedApps.sorted() {
-            let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundle)
-            let name = url?.deletingPathExtension().lastPathComponent ?? bundle
-            let entry = item(name, action: #selector(toggleApp(_:)), checked: true, in: exclusions)
+            guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundle) else { continue }
+            let name = url.deletingPathExtension().lastPathComponent
+            let entry = item("Resume in \(name)", action: #selector(toggleApp(_:)), in: exclusions)
             entry.representedObject = bundle
         }
-        item("Paused Apps").submenu = exclusions
-        let languages = NSMenu()
-        for language in NSSpellChecker.shared.availableLanguages.sorted() {
-            let label = Locale.current.localizedString(forIdentifier: language) ?? language
-            let entry = item(label, action: #selector(setLanguage(_:)), checked: preferences.language == language, in: languages)
-            entry.representedObject = language
-        }
-        item("Spelling Language").submenu = languages
-        if !preferences.ignoredWords.isEmpty {
-            let words = NSMenu()
-            for word in preferences.ignoredWords.sorted() {
-                let entry = item(word, action: #selector(unignoreWord(_:)), checked: true, in: words)
-                entry.representedObject = word
-            }
-            item("Ignored Words").submenu = words
-        }
+        if !exclusions.items.isEmpty { item("Paused Apps").submenu = exclusions }
+        item("Settings…", action: #selector(showSettings))
         menu.addItem(.separator())
         item("Launch at Login", action: #selector(toggleLogin), checked: SMAppService.mainApp.status == .enabled)
         if SMAppService.mainApp.status == .requiresApproval {
             item("Approve Launch at Login…", action: #selector(loginSettings))
         }
-        item(AXIsProcessTrusted() ? "Accessibility: Allowed" : "Allow Accessibility…", action: #selector(accessibilitySettings))
-        item(CGPreflightListenEventAccess() ? "Input Monitoring: Allowed" : "Allow Input Monitoring…", action: #selector(inputSettings))
-        item("Recheck Permissions", action: #selector(recheck))
+        let permissions = NSMenu()
+        item(AXIsProcessTrusted() ? "Accessibility: Allowed" : "Allow Accessibility…", action: #selector(accessibilitySettings), in: permissions)
+        item(CGPreflightListenEventAccess() ? "Input Monitoring: Allowed" : "Allow Input Monitoring…", action: #selector(inputSettings), in: permissions)
+        item("Recheck Permissions", action: #selector(recheck), in: permissions)
+        item("Permissions").submenu = permissions
         menu.addItem(.separator())
         item("Help & Source Code", action: #selector(help))
         item("Quit AutoCorrect", action: #selector(quit))
         updateIcon()
     }
 
+    @objc private func showSettings() { settings.present() }
+    @objc private func toggleUnderlines() { preferences.showsSpellingIndicators.toggle(); engine.refresh() }
     @objc private func toggleEnabled() { preferences.enabled.toggle(); engine.refresh() }
     @objc private func toggleApproval() { preferences.asksBeforeCorrecting.toggle(); engine.refresh() }
     @objc private func approve() { engine.approve() }
@@ -131,16 +129,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard let bundle = sender.representedObject as? String else { return }
         if preferences.excludedApps.contains(bundle) { preferences.excludedApps.remove(bundle) }
         else { preferences.excludedApps.insert(bundle) }
-        engine.refresh()
-    }
-    @objc private func setLanguage(_ sender: NSMenuItem) {
-        guard let language = sender.representedObject as? String else { return }
-        preferences.language = language
-        engine.refresh()
-    }
-    @objc private func unignoreWord(_ sender: NSMenuItem) {
-        guard let word = sender.representedObject as? String else { return }
-        preferences.ignoredWords.remove(word)
         engine.refresh()
     }
     @objc private func toggleLogin() {

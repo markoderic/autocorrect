@@ -2,7 +2,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 "$ROOT/scripts/build.sh"
-VERSION="${VERSION:-0.1.0}"
+VERSION="${VERSION:-0.2.0}"
 echo "Release files ready locally:"
 cat "$ROOT/dist/AutoCorrect-$VERSION-universal.zip.sha256"
 echo "Update Casks/autocorrect.rb with this SHA-256 before publishing."
