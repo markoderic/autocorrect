@@ -92,6 +92,7 @@ public enum CorrectionPolicy {
     public static func preferredAutomaticReplacement(for original: String, systemCorrection: String?, guesses: [String]) -> String? {
         guard isPlainWord(original), hasSafeCase(original) else { return nil }
         let source = Array(UserDictionary.normalizedKey(original))
+        if let repeated = repeatedConsonantReplacement(for: original, guesses: guesses) { return repeated }
         if source.count == 3, source.allSatisfy({ "bcdfghjklmnpqrstvwxz".contains($0) }) {
             for guess in guesses {
                 let target = Array(UserDictionary.normalizedKey(guess))
@@ -124,6 +125,39 @@ public enum CorrectionPolicy {
             return native
         }
         return rankedGuessReplacement(for: original, systemCorrection: systemCorrection, guesses: guesses)
+    }
+
+    /// A missing doubled consonant should not become an unrelated substitution:
+    /// kiding -> kidding preserves every letter; riding/hiding change the first one.
+    /// Only dictionary-ranked candidates participate, and competing repairs block it.
+    static func repeatedConsonantReplacement(for original: String, guesses: [String]) -> String? {
+        guard (5...32).contains(original.count), isPlainWord(original), hasSafeCase(original),
+              original.allSatisfy({ $0.asciiValue != nil && $0.isLetter }) else { return nil }
+        let source = original.lowercased()
+        let consonants = Set("bcdfgklmnprstz")
+        func collapsed(_ word: String) -> String {
+            var result = ""
+            for character in word {
+                if consonants.contains(character), result.last == character { continue }
+                result.append(character)
+            }
+            return result
+        }
+        let skeleton = collapsed(source)
+        guard let first = guesses.first, isPlainWord(first),
+              editDistance(Array(source), Array(first.lowercased())) <= 2 else { return nil }
+        let candidates = Set(guesses.prefix(8).compactMap { guess -> String? in
+            guard isPlainWord(guess), hasSafeCase(guess),
+                  guess.allSatisfy({ $0.asciiValue != nil && $0.isLetter }),
+                  original.first?.isUppercase == true || guess.first?.isUppercase != true else { return nil }
+            let target = guess.lowercased()
+            let delta = abs(target.count - source.count)
+            guard (1...2).contains(delta), collapsed(target) == skeleton,
+                  editDistance(Array(source), Array(target)) == delta else { return nil }
+            return target
+        })
+        guard candidates.count == 1, let target = candidates.first else { return nil }
+        return original.first?.isUppercase == true ? target.prefix(1).uppercased() + target.dropFirst() : target
     }
 
     /// Native automatic recommendation plus first-guess agreement permits two edits

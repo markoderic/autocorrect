@@ -21,6 +21,9 @@ public enum ContextualWritingRules {
         "keep", "take", "send", "run", "open", "close", "move", "count", "stop",
         "change", "finish", "review", "download", "install", "publish", "say"
     ]
+    // These variants can be dictionary words ("leets") or damaged contractions.
+    // Only invitation contexts permit changing them; an isolated token is ambiguous.
+    private static let invitationForms: Set<String> = ["lets", "leets", "letts", "leats", "ltes"]
     private static let possessionNouns: Set<String> = [
         "color", "colour", "size", "shape", "name", "owner", "price", "surface",
         "battery", "screen", "weight", "height", "width", "length"
@@ -57,7 +60,7 @@ public enum ContextualWritingRules {
             let range = matches[index].range
             let original = text.substring(with: range)
             let normalized = original.lowercased().replacingOccurrences(of: "’", with: "'")
-            guard ["its", "it's", "lets", "pleas"].contains(normalized),
+            guard (["its", "it's", "pleas"].contains(normalized) || invitationForms.contains(normalized)),
                   !original.dropFirst().contains(where: { $0.isUppercase }),
                   isWordBoundary(before: range.location, in: completedText) else { continue }
             let following = Array(matches[(index + 1)...])
@@ -103,7 +106,7 @@ public enum ContextualWritingRules {
                     automatic = hasPredicate
                     explanation = "This context may describe something belonging to it; possessive ‘its’ has no apostrophe."
                 }
-            } else if normalized == "lets", startsClause(at: range.location, in: text) {
+            } else if invitationForms.contains(normalized), startsClause(at: range.location, in: text) {
                 let verb = ["all", "just", "not", "also"].contains(after[0]) && after.count >= 2 ? after[1] : after[0]
                 if invitationVerbs.contains(verb) {
                     replacement = "let's"

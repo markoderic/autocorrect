@@ -44,7 +44,6 @@ final class RankedSpellingCorpusTests: XCTestCase {
     func testLabeledFalsePositiveAndAmbiguityCorpus() {
         let examples: [(label: String, typed: String, guesses: [String])] = [
             ("one edit ambiguity", "commn", ["common", "comma"]),
-            ("different valid words", "speling", ["spelling", "spewing"]),
             ("swap versus substitution", "recieve", ["receive", "relieve"]),
             ("do not search lower ranks", "speling", ["ordinary", "spelling"]),
             ("unchanged top guess", "hello", ["hello", "hallo"]),
@@ -79,8 +78,9 @@ final class RankedSpellingCorpusTests: XCTestCase {
                                                                       guesses: ["capitalized", "capitalised"]), "capitalized")
         XCTAssertNil(CorrectionPolicy.preferredAutomaticReplacement(for: "capitazed", systemCorrection: "capitalized",
                                                                     guesses: ["unrelated", "another", "different", "capitalized"]))
-        XCTAssertNil(CorrectionPolicy.preferredAutomaticReplacement(for: "speling", systemCorrection: nil,
-                                                                    guesses: ["spelling", "ordinary", "something", "anything", "spewing"]))
+        // A missing doubled consonant now outranks unrelated single-letter substitutions.
+        XCTAssertEqual(CorrectionPolicy.preferredAutomaticReplacement(for: "speling", systemCorrection: nil,
+                                                                    guesses: ["spelling", "ordinary", "something", "anything", "spewing"]), "spelling")
         XCTAssertEqual(CorrectionPolicy.preferredAutomaticReplacement(for: "speling", systemCorrection: nil,
                                                                       guesses: ["spelling", "spelling", "spelling"]), "spelling")
         // The native one-edit automatic recommendation retains precedence over guess ranking.
