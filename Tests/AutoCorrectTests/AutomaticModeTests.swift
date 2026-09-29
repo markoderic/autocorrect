@@ -43,9 +43,12 @@ final class AutomaticModeTests: XCTestCase {
                                     "tomoroww": "tomorrow", "buisnes": "business", "necesry": "necessary"] {
             let checker = NSSpellChecker.shared
             let range = NSRange(location: 0, length: word.utf16.count)
+            let miss = checker.checkSpelling(of: word, startingAt: 0, language: "en_US", wrap: false, inSpellDocumentWithTag: 0, wordCount: nil)
             let native = checker.correction(forWordRange: range, in: word, language: "en_US", inSpellDocumentWithTag: 0)
             let guesses = checker.guesses(forWordRange: range, in: word, language: "en_US", inSpellDocumentWithTag: 0)
-            XCTAssertEqual(engine.suggestion(word), replacement, "\(word); native=\(native ?? "nil"); guesses=\(guesses ?? [])")
+            let result = engine.suggestion(word)
+            let policy = CorrectionPolicy.preferredAutomaticReplacement(for: word, systemCorrection: native, guesses: guesses ?? [])
+            XCTAssertEqual(result, replacement, "\(word); miss=\(miss); policy=\(policy ?? "nil"); native=\(native ?? "nil"); guesses=\(guesses ?? []); recognized=\(NameLexicon.recognizes(word))")
         }
         XCTAssertNil(engine.suggestion("homebrew"))
         XCTAssertNil(engine.suggestion("har"))
