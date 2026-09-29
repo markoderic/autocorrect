@@ -362,9 +362,11 @@ final class CorrectionEngine {
                 let isolatedDocument = NSSpellChecker.uniqueSpellDocumentTag()
                 let isolated = checker.correction(forWordRange: NSRange(location: 0, length: word.utf16.count),
                     in: word + " ", language: preferences.language, inSpellDocumentWithTag: isolatedDocument)
+                let isolatedGuesses = checker.guesses(forWordRange: NSRange(location: 0, length: word.utf16.count),
+                    in: word + " ", language: preferences.language, inSpellDocumentWithTag: isolatedDocument) ?? []
                 checker.closeSpellDocument(withTag: isolatedDocument)
                 confident = CorrectionPolicy.isolatedFallback(for: word, contextualCorrection: proposed,
-                    contextualGuesses: guesses, isolatedCorrection: isolated)
+                    contextualGuesses: guesses, isolatedCorrection: isolated, isolatedGuesses: isolatedGuesses)
             }
             // Dictionary guesses can cover larger mistakes, but never apply them without approval.
             let review = preserveCompound ? guesses.first : (confident ?? proposed ?? guesses.first)

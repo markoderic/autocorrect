@@ -90,15 +90,44 @@ public enum CorrectionPolicy {
     /// signals only through the existing confidence gates; never override a conflicting
     /// contextual recommendation or search an unlimited list of guesses.
     public static func isolatedFallback(for original: String, contextualCorrection: String?,
-                                        contextualGuesses: [String], isolatedCorrection: String?) -> String? {
-        guard contextualCorrection == nil, let isolatedCorrection,
-              contextualGuesses.prefix(3).contains(where: {
-                  UserDictionary.normalizedKey($0) == UserDictionary.normalizedKey(isolatedCorrection)
-              }),
+                                        contextualGuesses: [String], isolatedCorrection: String?, isolatedGuesses: [String] = []) -> String? {
+        guard contextualCorrection == nil,
               !contextualGuesses.prefix(5).contains(where: {
                   UserDictionary.normalizedKey($0) == UserDictionary.normalizedKey(original)
               }) else { return nil }
-        return preferredAutomaticReplacement(for: original, systemCorrection: isolatedCorrection, guesses: contextualGuesses)
+        if let isolatedCorrection,
+              contextualGuesses.prefix(3).contains(where: {
+                  UserDictionary.normalizedKey($0) == UserDictionary.normalizedKey(isolatedCorrection)
+              }),
+           let replacement = preferredAutomaticReplacement(for: original, systemCorrection: isolatedCorrection, guesses: contextualGuesses) {
+            return replacement
+        }
+        // Both automatic recommendations can be absent. Ranked guesses still let us
+        // corroborate a one-edit top choice or a unique repair preserving typed letters.
+        // This is a bounded heuristic, not an independent probability estimate.
+        guard isPlainWord(original), hasSafeCase(original), original.count >= 3 else { return nil }
+        if let first = contextualGuesses.first, let isolatedFirst = isolatedGuesses.first,
+           UserDictionary.normalizedKey(first) == UserDictionary.normalizedKey(isolatedFirst),
+           let replacement = confidentReplacement(for: original, suggestion: first) { return replacement }
+        let source = Array(UserDictionary.normalizedKey(original))
+        let corroborated = Set(isolatedGuesses.prefix(3).map(UserDictionary.normalizedKey))
+        let repairs = Set(contextualGuesses.prefix(3).compactMap { guess -> String? in
+            let targetKey = UserDictionary.normalizedKey(guess)
+            guard corroborated.contains(targetKey), isPlainWord(guess), hasSafeCase(guess),
+                  original.first?.isUppercase == true || guess.first?.isUppercase != true else { return nil }
+            let target = Array(targetKey)
+            if source.count >= 4, isAdjacentTransposition(source, target) { return targetKey }
+            let delta = target.count - source.count
+            guard source.count >= 4, delta == 1 || (delta == 2 && source.count >= 8),
+                  source.first == target.first, source.last == target.last else { return nil }
+            var matched = 0
+            for character in target where matched < source.count {
+                if character == source[matched] { matched += 1 }
+            }
+            return matched == source.count ? targetKey : nil
+        })
+        guard repairs.count == 1, let replacement = repairs.first else { return nil }
+        return original.first?.isUppercase == true ? replacement.prefix(1).uppercased() + replacement.dropFirst() : replacement
     }
 
     /// Chooses from the native spell checker's contextual correction and ranked guesses.

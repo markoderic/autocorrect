@@ -33,4 +33,34 @@ final class IsolatedSpellingFallbackTests: XCTestCase {
         XCTAssertNil(CorrectionPolicy.isolatedFallback(for: "teh", contextualCorrection: nil,
             contextualGuesses: ["the"], isolatedCorrection: nil))
     }
+    func testMissingBothRecommendationsUsesCorroboratedRankedGuesses() {
+        for (word, expected, context, isolated) in [
+            ("teh", "the", ["the", "tea"], ["the", "ten"]),
+            ("recieve", "receive", ["receive", "relieve"], ["receive", "relieve"]),
+            ("wierd", "weird", ["weird", "wired", "wield"], ["weird", "wired", "wield"]),
+            ("frend", "friend", ["trend", "friend", "Fred"], ["Fred", "friend", "trend"]),
+            ("beleived", "believed", ["beloved", "believed"], ["believed", "beloved"]),
+            ("capitazed", "capitalized", ["captioned", "capitalized"], ["captioned", "capitalized"])
+        ] {
+            XCTAssertEqual(CorrectionPolicy.isolatedFallback(for: word, contextualCorrection: nil,
+                contextualGuesses: context, isolatedCorrection: nil, isolatedGuesses: isolated), expected)
+        }
+    }
+
+    func testRankedFallbackRetainsAmbiguityAndDistanceBounds() {
+        for (word, context, isolated) in [
+            ("wierd", ["wired", "weird"], ["weird", "wired"]),
+            ("teh", ["the"], ["tea"]),
+            ("har", ["that"], ["that"]),
+            ("capitazed", ["captioned", "capitalized"], ["ordinary"]),
+            ("abcd", ["abcdef"], ["abcdef"]),
+            ("frend", ["Friend"], ["Friend"]),
+            ("TEH", ["the"], ["the"]),
+            ("teh.txt", ["the.txt"], ["the.txt"])
+        ] {
+            XCTAssertNil(CorrectionPolicy.isolatedFallback(for: word, contextualCorrection: nil,
+                contextualGuesses: context, isolatedCorrection: nil, isolatedGuesses: isolated), word)
+        }
+    }
+
 }
