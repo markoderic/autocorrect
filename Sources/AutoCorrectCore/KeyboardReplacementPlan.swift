@@ -28,7 +28,7 @@ public struct KeyboardReplacementPlan: Equatable, Sendable {
         // Reject a range that names only the tail of a larger word/identifier.
         if let preceding = prefix.last {
             guard preceding.unicodeScalars.allSatisfy({ CharacterSet.whitespacesAndNewlines.contains($0) }) ||
-                    "([\"“«{".contains(preceding) else { return nil }
+                    "([\"'‘“«{".contains(preceding) else { return nil }
         }
 
         let removed = original + suffix

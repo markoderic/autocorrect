@@ -1,3 +1,19 @@
+# 0.2.3 validation
+
+Checked September 29, 2026 on Apple silicon, macOS 26.6, Swift 6.4.
+
+- All 59 tests passed, 0 failures. New tests cover period capitalization, abbreviations/initials/structured text, single-letter words, exact custom and ignored precedence, disabling capitalization while keeping spelling correction, preference persistence, Claude's actual framework name, bounded AXValue fallback with no character count, invalid/oversize ranges, and quoted-word replacement plans.
+- Installed Settings UI shows “Capitalize after a period,” initially on. Turned it off, saved, relaunched, and confirmed the checkbox remained off. Restored on and saved. This is a real UI/persistence check; automatic text capitalization is covered by engine tests, not a claimed cross-app physical-keyboard pass.
+- Native spelling/engine checks: `Done. hello → Hello`, `Done. a → A`, `Done. teh → The`, `Dr. smith` unchanged. The existing English writing fixes still pass.
+- Claude's installed Electron 44.4.3 uses `Electron Framework.framework`. Detection includes that exact name. Preparation requests AXManualAccessibility once after success; transient failures retry at least five seconds apart, at most three attempts, without polling. This avoids resetting Electron's two-second activation delay on each word. App exclusions remain intact; Claude is not paused.
+- Added an AXValue fallback when AXNumberOfCharacters is absent, retaining strict real-caret, value-size, range, focus, and physical-input checks. Snapshot and text writes are otherwise unchanged. Diagnostic phases can distinguish unsupported fields from input/verification failures without logging typed content.
+- Universal arm64/x86_64 build and strict signature verification passed. ZIP: 225,098 bytes; SHA-256 `43b8d295e32676e0756a6878eb2fe453688ebe7f85cc0e7779740173c9d5ca7a`. Installed Accessibility, Input Monitoring, keyboard listener, and login registration checks pass.
+- User-verified Claude desktop keyboard check after installation: typing `teh ` followed by `next` corrected to `the next`, with both words preserved. This is a user-confirmed real interaction, not an automated UI pass. Other applications are not assumed compatible from Claude alone.
+
+Primary compatibility references: [Electron accessibility API](https://www.electronjs.org/docs/latest/tutorial/accessibility), [version-matched activation delay](https://github.com/electron/electron/blob/v44.4.3/shell/browser/mac/electron_application.mm), [Chromium character-count implementation](https://github.com/chromium/chromium/blob/main/ui/accessibility/platform/browser_accessibility_cocoa.mm).
+
+---
+
 # 0.2.2 validation
 
 Checked September 29, 2026 on Apple silicon, macOS 26.6, Swift 6.4.

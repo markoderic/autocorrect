@@ -88,4 +88,12 @@ final class KeyboardReplacementPlanTests: XCTestCase {
         let tooLong = String(repeating: "a", count: 89)
         XCTAssertNil(plan(tooLong + String(repeating: " ", count: 8), word: tooLong, replacement: "word"))
     }
+    func testSentenceCapitalizationAfterOpeningSingleQuote() throws {
+        for text in ["Done. 'hello ", "Done. ‘hello "] {
+            let candidate = try XCTUnwrap(SentenceCapitalization.candidate(in: text, caret: text.utf16.count))
+            let edit = try XCTUnwrap(KeyboardReplacementPlan.make(text: text, wordRange: candidate.range, replacement: "Hello"))
+            XCTAssertEqual(edit.expectedText, text.replacingOccurrences(of: "hello", with: "Hello"))
+        }
+    }
+
 }

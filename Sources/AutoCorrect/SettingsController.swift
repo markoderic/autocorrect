@@ -14,6 +14,7 @@ final class SettingsController: NSWindowController, NSTableViewDataSource, NSTab
     private let message = NSTextField(wrappingLabelWithString: "")
     private let underlines = NSButton(checkboxWithTitle: "Show red spelling underlines", target: nil, action: nil)
     private let approval = NSButton(checkboxWithTitle: "Ask before applying corrections", target: nil, action: nil)
+    private let capitalization = NSButton(checkboxWithTitle: "Capitalize after a period", target: nil, action: nil)
     private let language = NSPopUpButton()
 
     init(preferences: Preferences, onSave: @escaping () -> Void) {
@@ -36,6 +37,7 @@ final class SettingsController: NSWindowController, NSTableViewDataSource, NSTab
         wordField.stringValue = ""; fromField.stringValue = ""; toField.stringValue = ""
         underlines.state = preferences.showsSpellingIndicators ? .on : .off
         approval.state = preferences.asksBeforeCorrecting ? .on : .off
+        capitalization.state = preferences.capitalizesAfterPeriod ? .on : .off
         language.selectItem(withTitle: "English (US)")
         for item in language.itemArray where item.representedObject as? String == preferences.language { language.select(item) }
         message.stringValue = ""
@@ -99,7 +101,7 @@ final class SettingsController: NSWindowController, NSTableViewDataSource, NSTab
         }
         addTab("General", content: stack([
             stack([NSTextField(labelWithString: "Language"), language], horizontal: true),
-            approval, underlines,
+            approval, capitalization, underlines,
             label("Underlines mark possible misspellings in supported text fields. They clear when you type, click, scroll, or switch apps."),
             label("Apple’s local dictionaries check both common and uncommon words. Uncertain suggestions wait for your approval. Custom corrections use the exact spelling you choose.")
         ]))
@@ -179,6 +181,7 @@ final class SettingsController: NSWindowController, NSTableViewDataSource, NSTab
             preferences.customCorrections = dictionary.corrections
             preferences.showsSpellingIndicators = underlines.state == .on
             preferences.asksBeforeCorrecting = approval.state == .on
+            preferences.capitalizesAfterPeriod = capitalization.state == .on
             preferences.language = language.selectedItem?.representedObject as? String ?? "en_US"
             onSave(); close()
         } catch { report(error) }

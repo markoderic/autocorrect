@@ -41,8 +41,20 @@ final class CorrectionEngine {
         guard preferences.enabled else { monitor.stop(); status = "Paused"; onChange?(); return }
         guard AXIsProcessTrusted() else { monitor.stop(); status = "Accessibility permission needed"; onChange?(); return }
         guard CGPreflightListenEventAccess() else { monitor.stop(); status = "Input Monitoring permission needed"; onChange?(); return }
+        prepareFocusedApplication()
         status = monitor.start() ? "Ready" : "Keyboard access unavailable — restart AutoCorrect"
         onChange?()
+    }
+
+    func focusChanged() {
+        invalidate()
+        prepareFocusedApplication()
+    }
+
+    private func prepareFocusedApplication() {
+        guard preferences.enabled, let app = NSWorkspace.shared.frontmostApplication,
+              let bundle = app.bundleIdentifier, !preferences.excludedApps.contains(bundle) else { return }
+        AccessibilityText.prepare(app: app)
     }
 
     private func cancelScheduled() {
@@ -72,6 +84,7 @@ final class CorrectionEngine {
               ![36, 48, 76].contains(keyCode), // Return and Tab can submit or change fields.
               let text = text, text.count == 1, let character = text.first,
               CorrectionPolicy.isDelimiter(character) else { return }
+        RuntimeDiagnostics.record("boundary observed")
         let ticket = generation
         let task = DispatchWorkItem { [weak self] in
             guard let self = self, self.generation == ticket else { return }
@@ -86,14 +99,21 @@ final class CorrectionEngine {
         guard AXIsProcessTrusted(), KeyboardMonitor.safeInputSource,
               let app = NSWorkspace.shared.frontmostApplication,
               app.processIdentifier != ProcessInfo.processInfo.processIdentifier,
-              let bundleID = app.bundleIdentifier, !preferences.excludedApps.contains(bundleID),
-              let snapshot = AccessibilityText.snapshot(pid: app.processIdentifier),
-              let candidate = CorrectionPolicy.candidate(in: snapshot.text, caret: (snapshot.text as NSString).length, caseExceptions: Set(preferences.customCorrections.keys)),
+              let bundleID = app.bundleIdentifier, !preferences.excludedApps.contains(bundleID) else { return }
+        AccessibilityText.prepare(app: app)
+        guard let snapshot = AccessibilityText.snapshot(pid: app.processIdentifier) else {
+            status = "Text access unavailable in \(app.localizedName ?? "this app")"
+            onChange?()
+            return
+        }
+        if status.hasPrefix("Text access unavailable") { status = "Ready"; onChange?() }
+        guard let candidate = candidate(in: snapshot.text),
               // A clipped window must not turn the end of an identifier into an apparent whole word.
               snapshot.windowStart == 0 || candidate.range.location > 0,
               !preferences.ignoredWords.contains(UserDictionary.normalizedKey(candidate.original)) else { return }
         let result = assessment(candidate.original, context: snapshot.text, range: candidate.range)
-        guard result.misspelled else { return }
+        guard result.misspelled else { RuntimeDiagnostics.record("no correction needed"); return }
+        RuntimeDiagnostics.record("correction assessed")
         flaggedWord = candidate.original
         guard let replacement = result.replacement else {
             status = "Possible misspelling: \(candidate.original)"
@@ -112,6 +132,18 @@ final class CorrectionEngine {
         }
     }
 
+    private func candidate(in text: String) -> CorrectionCandidate? {
+        CorrectionPolicy.candidate(in: text, caret: text.utf16.count, caseExceptions: Set(preferences.customCorrections.keys))
+            ?? (preferences.capitalizesAfterPeriod ? SentenceCapitalization.candidate(in: text, caret: text.utf16.count) : nil)
+    }
+
+    /// Uses exactly the same completed-word assessment as the keyboard path, without edits.
+    func suggestion(in completedText: String) -> String? {
+        guard let candidate = candidate(in: completedText) else { return nil }
+        let result = assessment(candidate.original, context: completedText, range: candidate.range)
+        return result.misspelled && result.automatic ? result.replacement : nil
+    }
+
     func suggestion(_ word: String) -> String? {
         let result = assessment(word)
         return result.misspelled && result.automatic ? result.replacement : nil
@@ -123,6 +155,15 @@ final class CorrectionEngine {
         if let custom = preferences.customCorrections[normalized] {
             return Assessment(misspelled: custom != word, replacement: custom, automatic: true)
         }
+        let spelling = spellingAssessment(word, context: context, range: range)
+        guard preferences.capitalizesAfterPeriod, let context, let range,
+              let sentence = SentenceCapitalization.candidate(in: context, caret: context.utf16.count), sentence.range == range,
+              let chosen = spelling.replacement ?? (spelling.misspelled ? nil : word),
+              let capitalized = SentenceCapitalization.replacement(for: chosen) else { return spelling }
+        return Assessment(misspelled: true, replacement: capitalized, automatic: !spelling.misspelled || spelling.automatic)
+    }
+
+    private func spellingAssessment(_ word: String, context: String?, range: NSRange?) -> Assessment {
         if let writing = EnglishWritingRules.replacement(for: word, language: preferences.language) {
             return Assessment(misspelled: true, replacement: writing, automatic: true)
         }
@@ -197,11 +238,13 @@ final class CorrectionEngine {
                 if attempt < 2 {
                     self.verify(proposal, plan: plan, ticket: ticket, isUndo: isUndo, andIgnore: andIgnore, attempt: attempt + 1)
                 } else if self.generation == ticket {
+                    RuntimeDiagnostics.record("correction unconfirmed")
                     self.status = "Editor did not confirm correction"
                     self.onChange?()
                 }
                 return
             }
+            RuntimeDiagnostics.record("correction verified")
             self.correctionCount = max(0, self.correctionCount + (isUndo ? -1 : 1))
             if andIgnore { self.preferences.ignoredWords.insert(UserDictionary.normalizedKey(proposal.replacement)) }
             // Continued typing is fine, but Undo must never act on a newer word.

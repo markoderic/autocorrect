@@ -36,4 +36,30 @@ final class EnglishWritingIntegrationTests: XCTestCase {
         preferences.ignoredWords = dictionary.ignoredWords
         for word in ["im", "ti", "doesnt", "i"] { XCTAssertNil(engine.suggestion(word)) }
     }
+    func testSentenceCapitalizationToggleAndSpellingCombination() {
+        let engine = CorrectionEngine(preferences: preferences)
+        XCTAssertEqual(engine.suggestion(in: "Done. hello "), "Hello")
+        XCTAssertEqual(engine.suggestion(in: "Done. a "), "A")
+        XCTAssertEqual(engine.suggestion(in: "Done. teh "), "The")
+        XCTAssertEqual(engine.suggestion(in: "Done. doesnt "), "Doesn't")
+        XCTAssertNil(engine.suggestion(in: "Talk to Dr. smith "))
+        preferences.capitalizesAfterPeriod = false
+        XCTAssertNil(engine.suggestion(in: "Done. hello "))
+        XCTAssertNil(engine.suggestion(in: "Done. a "))
+        XCTAssertEqual(engine.suggestion(in: "Done. teh "), "the")
+        XCTAssertEqual(engine.suggestion(in: "Done. doesnt "), "doesn't")
+    }
+
+    func testCapitalizationPreservesExplicitUserSpellingAndIgnoredWords() {
+        let engine = CorrectionEngine(preferences: preferences)
+        preferences.customCorrections = ["helo": "hello", "brand": "eBay", "hello": "hello"]
+        XCTAssertEqual(engine.suggestion(in: "Done. helo "), "hello")
+        XCTAssertEqual(engine.suggestion(in: "Done. brand "), "eBay")
+        XCTAssertNil(engine.suggestion(in: "Done. hello "))
+        preferences.ignoredWords = ["word", "i", "doesnt"]
+        for word in ["word", "i", "doesnt"] {
+            XCTAssertNil(engine.suggestion(in: "Done. \(word) "))
+        }
+    }
+
 }

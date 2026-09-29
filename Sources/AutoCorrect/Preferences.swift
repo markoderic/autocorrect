@@ -20,6 +20,10 @@ final class Preferences {
         get { defaults.object(forKey: "showsSpellingIndicators") as? Bool ?? true }
         set { defaults.set(newValue, forKey: "showsSpellingIndicators") }
     }
+    var capitalizesAfterPeriod: Bool {
+        get { defaults.object(forKey: "capitalizesAfterPeriod") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "capitalizesAfterPeriod") }
+    }
     var customCorrections: [String: String] {
         get { defaults.dictionary(forKey: "customCorrections") as? [String: String] ?? [:] }
         set { defaults.set(newValue, forKey: "customCorrections") }

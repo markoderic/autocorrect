@@ -33,11 +33,14 @@ final class KeyboardMonitor {
                 // The trigger is a text-free modifier event, consumed even if its request expired.
                 if let edit = monitor.pendingEdit, edit.marker == marker {
                     monitor.pendingEdit = nil
+                    RuntimeDiagnostics.record("edit trigger received")
                     let valid = monitor.isRunning && edit.validate()
+                    RuntimeDiagnostics.record(valid ? "edit revalidated" : "edit canceled")
                     if valid {
                         // Apple guarantees these events are delivered before the event returned
                         // by this callback. Keep the complete edit ahead of the next typed key.
                         for generated in edit.events { generated.tapPostEvent(proxy) }
+                        RuntimeDiagnostics.record("edit posted")
                     }
                     DispatchQueue.main.async { edit.completion(valid) }
                 }
@@ -88,6 +91,7 @@ final class KeyboardMonitor {
         trigger.flags = []
         trigger.setIntegerValueField(.eventSourceUserData, value: marker)
         pendingEdit = PendingEdit(marker: marker, events: events, validate: validate, completion: completion)
+        RuntimeDiagnostics.record("edit queued")
         trigger.post(tap: .cgSessionEventTap)
         DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(250)) { [weak self] in
             guard self?.pendingEdit?.marker == marker else { return }

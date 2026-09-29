@@ -4,7 +4,7 @@ A small native macOS menu bar app that corrects spelling when you finish typing 
 
 Requires **macOS 13 Ventura or later**, on Apple silicon or Intel.
 
-**0.2.2 is a preview.** Unit tests, universal packaging, local launch, and login registration have been checked. Compatibility with individual editors and underline placement still need real keyboard testing; see [validation](docs/VALIDATION.md).
+**0.2.3 is a preview.** Unit tests, universal packaging, local launch, and login registration have been checked. Compatibility with individual editors and underline placement still need real keyboard testing; see [validation](docs/VALIDATION.md).
 
 ## What it does
 
@@ -15,6 +15,7 @@ Requires **macOS 13 Ventura or later**, on Apple silicon or Intel.
 - A simple **Aa** menu bar icon. To pause one app, open that app, then choose **Aa → Pause in [app]**. Choose **Resume in [app]** to turn it back on. The Paused Apps submenu only lists apps installed on your Mac.
 - **Settings → Ignored Words:** add names or words that should never be corrected or marked. Remove a word to check it again. Matching ignores capitalization.
 - **Settings → Custom Corrections:** choose a typed word and its replacement, including exact capitalization. Add the same typed word again to update it. Ignored words take precedence over custom corrections.
+- **Settings → General → Capitalize after a period:** enabled by default. Capitalizes the next completed word when you type its space or punctuation (`Done. hello ` → `Done. Hello `). Turn it off independently of spelling correction. Common abbreviations, initials, decimals, URLs, and ambiguous period endings are skipped. Ignored words and exact custom replacements keep priority.
 - **Show Spelling Underlines:** optionally draw a red wavy underline beneath the latest completed possible misspelling. This requires the host app to expose the word's on-screen bounds. It clears on typing, clicking, scrolling, app switching, or after five seconds. It does not continuously mark the whole document.
 - English (US) is the default; the language selector is in Settings. Uncertain dictionary suggestions require approval even in automatic mode.
 - Automatically requests launch at login on first launch; you can turn it off in the menu bar.
@@ -25,7 +26,7 @@ This release handles **spelling and a small set of English writing rules**. It d
 
 ## Install
 
-Download `AutoCorrect-0.2.2-universal.zip` from [Releases](https://github.com/markoderic/autocorrect/releases), unzip it, and move **AutoCorrect.app** to **Applications**. Open it and look for its menu bar item.
+Download `AutoCorrect-0.2.3-universal.zip` from [Releases](https://github.com/markoderic/autocorrect/releases), unzip it, and move **AutoCorrect.app** to **Applications**. Open it and look for its menu bar item.
 
 Release builds are **ad-hoc signed and not Apple notarized**. macOS may block the first launch of a downloaded copy. If you trust the source, attempt to open the app, then go to **System Settings → Privacy & Security → Open Anyway** and confirm. Follow the macOS instructions shown for your version. You do not need to disable Gatekeeper.
 
@@ -53,7 +54,7 @@ The cask installs the same app and has the same permissions and first-launch req
 
 ## Compatibility and privacy
 
-AutoCorrect relies on each app exposing a usable text field through macOS Accessibility. Some browser editors, custom controls, terminals, remote desktops, and apps with restricted accessibility will not work. It skips password fields, unsupported fields, and input methods that use composition (IME). Common coding apps, terminals, and password managers are paused by default; use **Paused Apps** to change those exclusions. It checks that the focus, selection, and surrounding text still match before applying a correction. Corrections no longer write selected text through Accessibility, which could leave a word selected and cause the next keystroke to overwrite it. A complete keyboard edit is prepared before anything is deleted; stale edits are canceled, and verification never retries a deletion. Original words and their trailing delimiters must be ASCII for predictable backspace behavior; the preceding text and replacement may contain Unicode. It does not promise support for every app.
+AutoCorrect relies on each app exposing a usable text field through macOS Accessibility. For Electron apps such as Claude and detected Chromium browsers, it requests accessibility support on activation. Some apps need about two seconds to expose their text tree. Successful requests are made once per process launch; transient failures have bounded retries. Rich editors without a character-count attribute can use a bounded text-value fallback when they expose a real caret. Some browser editors, custom controls, terminals, remote desktops, and apps with restricted accessibility will not work. It skips password fields, unsupported fields, and input methods that use composition (IME). Common coding apps, terminals, and password managers are paused by default; use **Paused Apps** to change those exclusions. It checks that the focus, selection, and surrounding text still match before applying a correction. Corrections no longer write selected text through Accessibility, which could leave a word selected and cause the next keystroke to overwrite it. A complete keyboard edit is prepared before anything is deleted; stale edits are canceled, and verification never retries a deletion. Original words and their trailing delimiters must be ASCII for predictable backspace behavior; the preceding text and replacement may contain Unicode. It does not promise support for every app.
 
 Spelling checks run locally through `NSSpellChecker`. AutoCorrect does not send your text to a server or save a typing history. It inspects at most 256 UTF-16 units before the cursor, with a bounded fallback for small fields, and caches up to 256 spelling results in memory. App exclusions, deliberately ignored words, and settings are stored locally. macOS may also apply its own spelling corrections; if you see conflicting behavior, disable one of the correction systems for that app.
 
@@ -76,8 +77,8 @@ The build script compiles **arm64 and x86_64**, combines them into a universal e
 
 ```text
 dist/AutoCorrect.app
-dist/AutoCorrect-0.2.2-universal.zip
-dist/AutoCorrect-0.2.2-universal.zip.sha256
+dist/AutoCorrect-0.2.3-universal.zip
+dist/AutoCorrect-0.2.3-universal.zip.sha256
 ```
 
 It can be called from any working directory. The installer uses `/Applications` when writable, otherwise `~/Applications`. Use `--user` to choose `~/Applications`, `--no-open` to install without launching, and `--replace` to replace an existing installation. Quit AutoCorrect before replacing it; the installer preserves the previous bundle alongside the new one.
@@ -94,7 +95,7 @@ A local development signature is not a notarized distribution release. The repos
 
 `swift test --build-system native` exercises the pure correction policy. The GitHub Actions workflow runs those tests and builds a universal app archive. Building or passing unit tests does **not** verify macOS permissions, real typing behavior, login behavior, or compatibility with a particular app.
 
-The installed binary also supports `--diagnostics` (permission and login status only) and `--check-spelling` (fixed sample words only). Neither command reads another app's text.
+The installed binary also supports `--diagnostics` (permission and login status only) and `--check-spelling` (fixed sample words only). Neither command reads another app's text. Developers can launch a single app instance with `--trace` to print fixed diagnostic phase labels (boundary, snapshot, edit, verification), never typed text or app names. Normal operation does not log these phases.
 
 For a manual check after granting permissions:
 

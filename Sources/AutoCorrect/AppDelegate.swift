@@ -16,7 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.delegate = self
         engine.onChange = { [weak self] in self?.updateIcon() }
         workspaceObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] _ in
-            self?.engine.invalidate()
+            self?.engine.focusChanged()
             self?.updateIcon()
         }
         // Warm the system spelling service before installing the active event tap.

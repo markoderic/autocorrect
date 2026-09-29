@@ -17,6 +17,9 @@ if CommandLine.arguments.contains("--diagnostics") {
     for word in ["i", "im", "i'm", "ive", "doesnt", "dont", "didnt", "cant", "wont", "youre", "ti", "teh", "ths", "mispell", "ill", "well", "were", "its", "world", "Marko", "GitHub"] {
         print("\(word) → \(engine.suggestion(word) ?? "(unchanged)")")
     }
+    for text in ["Done. hello ", "Done. a ", "Done. teh ", "Dr. smith "] {
+        print("\(text)→ \(engine.suggestion(in: text) ?? "(unchanged)")")
+    }
 } else {
     let delegate = AppDelegate()
     application.delegate = delegate
