@@ -15,6 +15,15 @@ final class RepeatedConsonantTests: XCTestCase {
             XCTAssertNil(CorrectionPolicy.repeatedConsonantReplacement(for: source, guesses: [guess]), source)
         }
     }
+    func testRankedFallbackWhenNativeAutomaticRecommendationIsMissing() {
+        for (source, target) in [("buisnes", "business"), ("finnaly", "finally"), ("beutifl", "beautiful"), ("necesry", "necessary")] {
+            XCTAssertEqual(CorrectionPolicy.preferredAutomaticReplacement(for: source, systemCorrection: nil, guesses: [target]), target)
+        }
+        XCTAssertEqual(CorrectionPolicy.preferredAutomaticReplacement(for: "probly", systemCorrection: nil, guesses: ["probably", "portly"]), "probably")
+        XCTAssertNil(CorrectionPolicy.preferredAutomaticReplacement(for: "finnaly", systemCorrection: nil, guesses: ["finally", "finely"]))
+        XCTAssertNil(CorrectionPolicy.preferredAutomaticReplacement(for: "xapitalzed", systemCorrection: nil, guesses: ["capitalized"]))
+    }
+
     func testInvitationVariantsUseContextRatherThanGlobalReplacement() {
         for source in ["leets", "letts", "leats", "ltes", "lets"] {
             XCTAssertEqual(ContextualWritingRules.candidate(in: source + " see ")?.replacement, "let's")

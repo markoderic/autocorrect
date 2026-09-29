@@ -160,11 +160,11 @@ public enum CorrectionPolicy {
         return original.first?.isUppercase == true ? target.prefix(1).uppercased() + target.dropFirst() : target
     }
 
-    /// Native automatic recommendation plus first-guess agreement permits two edits
-    /// in ordinary 5+ letter words, including missing letters and damaged endings.
-    /// A strictly closer alternative still blocks this broader fallback.
+    /// Native agreement permits two edits in 5+ letter words. Without an automatic
+    /// recommendation, a 6+ letter first guess needs matching ends and stronger
+    /// sole-candidate or insertion-only evidence. Closer alternatives block both paths.
     private static func broaderNativeReplacement(for original: String, systemCorrection: String?, guesses: [String]) -> String? {
-        guard original.count >= 5, let proposed = systemCorrection,
+        guard original.count >= 5, let proposed = systemCorrection ?? guesses.first,
               isPlainWord(proposed), hasSafeCase(proposed),
               original.first?.isUppercase == true || proposed.first?.isUppercase != true,
               guesses.first.map(UserDictionary.normalizedKey) == UserDictionary.normalizedKey(proposed) else { return nil }
@@ -176,6 +176,18 @@ public enum CorrectionPolicy {
                   let other = UserDictionary.normalizedKey($0)
                   return other != target && editDistance(source, Array(other)) < distance
               }) else { return nil }
+        if systemCorrection == nil {
+            // macOS can supply ranked guesses but omit its automatic recommendation.
+            // Require matching ends and either a sole guess or insertion-only repair.
+            guard source.count >= 6, source.first == target.first, source.last == target.last else { return nil }
+            var matched = 0
+            for character in target where matched < source.count {
+                if character == source[matched] { matched += 1 }
+            }
+            let insertionOnly = target.count - source.count == distance && matched == source.count
+            let uniqueGuess = Set(guesses.prefix(5).map(UserDictionary.normalizedKey)).count == 1
+            guard insertionOnly || uniqueGuess else { return nil }
+        }
         return original.first?.isUppercase == true ? target.prefix(1).uppercased() + target.dropFirst() : target
     }
 
