@@ -342,7 +342,7 @@ final class CorrectionEngine {
             if let split = JoinedWordPolicy.replacement(for: word, language: preferences.language,
                     systemCorrection: proposed, guesses: guesses, isWord: { part in
                         checker.checkSpelling(of: part, startingAt: 0, language: self.preferences.language,
-                            wrap: false, inSpellDocumentWithTag: self.spellDocument, wordCount: nil).location == NSNotFound
+                            wrap: false, inSpellDocumentWithTag: spellDocument, wordCount: nil).location == NSNotFound
                     }) {
                 return Assessment(misspelled: true, replacement: split, automatic: preferences.separatesJoinedWords)
             }
@@ -501,5 +501,5 @@ final class CorrectionEngine {
         onChange?()
     }
 
-    deinit { monitor.stop(); NSSpellChecker.shared.closeSpellDocument(withTag: spellDocument) }
+    deinit { monitor.stop() }
 }
