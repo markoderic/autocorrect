@@ -85,6 +85,22 @@ public enum CorrectionPolicy {
         validatedReplacement(for: original, suggestion: suggestion, allowShortInsertion: false)
     }
 
+    /// macOS can omit its automatic recommendation in a sentence while retaining
+    /// ranked guesses and an isolated-word recommendation. Reconcile those two
+    /// signals only for a supported one-edit repair; never override a conflicting
+    /// contextual recommendation or search an unlimited list of guesses.
+    public static func isolatedFallback(for original: String, contextualCorrection: String?,
+                                        contextualGuesses: [String], isolatedCorrection: String?) -> String? {
+        guard contextualCorrection == nil, let isolatedCorrection,
+              contextualGuesses.prefix(3).contains(where: {
+                  UserDictionary.normalizedKey($0) == UserDictionary.normalizedKey(isolatedCorrection)
+              }),
+              !contextualGuesses.prefix(5).contains(where: {
+                  UserDictionary.normalizedKey($0) == UserDictionary.normalizedKey(original)
+              }) else { return nil }
+        return confidentReplacement(for: original, suggestion: isolatedCorrection)
+    }
+
     /// Chooses from the native spell checker's contextual correction and ranked guesses.
     /// Call only after the native checker identifies `original` as misspelled. For three
     /// ASCII consonants, prefer a guess that preserves every typed letter and inserts one

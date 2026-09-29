@@ -351,7 +351,13 @@ final class CorrectionEngine {
                 return Assessment(misspelled: true, replacement: product, automatic: true)
             }
             let preserveCompound = CompoundSpellingPolicy.prefersUnchangedLetters(for: word, guesses: guesses)
-            let confident = preserveCompound ? nil : CorrectionPolicy.preferredAutomaticReplacement(for: word, systemCorrection: proposed, guesses: guesses)
+            var confident = preserveCompound ? nil : CorrectionPolicy.preferredAutomaticReplacement(for: word, systemCorrection: proposed, guesses: guesses)
+            if confident == nil, !preserveCompound, proposed == nil, text != word {
+                let isolated = checker.correction(forWordRange: NSRange(location: 0, length: word.utf16.count),
+                    in: word, language: preferences.language, inSpellDocumentWithTag: spellDocument)
+                confident = CorrectionPolicy.isolatedFallback(for: word, contextualCorrection: proposed,
+                    contextualGuesses: guesses, isolatedCorrection: isolated)
+            }
             // Dictionary guesses can cover larger mistakes, but never apply them without approval.
             let review = preserveCompound ? guesses.first : (confident ?? proposed ?? guesses.first)
             answer = Assessment(misspelled: true, replacement: review, automatic: confident != nil)
