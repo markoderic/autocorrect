@@ -1,5 +1,5 @@
 #!/bin/bash
-# Notarize an already Developer ID-signed build. Never strips quarantine or bypasses Gatekeeper.
+# Notarize an already Developer ID-signed build. Never changes downloaded customer apps or bypasses Gatekeeper.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP="$ROOT/dist/AutoCorrect.app"
