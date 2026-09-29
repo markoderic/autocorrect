@@ -123,6 +123,9 @@ final class CorrectionEngine {
         if let custom = preferences.customCorrections[normalized] {
             return Assessment(misspelled: custom != word, replacement: custom, automatic: true)
         }
+        if let writing = EnglishWritingRules.replacement(for: word, language: preferences.language) {
+            return Assessment(misspelled: true, replacement: writing, automatic: true)
+        }
         let text = context ?? word
         let wordRange = range ?? NSRange(location: 0, length: (word as NSString).length)
         let key = preferences.language + ":" + text + ":" + String(wordRange.location)

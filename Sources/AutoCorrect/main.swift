@@ -14,7 +14,7 @@ if CommandLine.arguments.contains("--diagnostics") {
 } else if CommandLine.arguments.contains("--check-spelling") {
     let preferences = Preferences()
     let engine = CorrectionEngine(preferences: preferences)
-    for word in ["teh", "ths", "wth", "frm", "thsi", "helllo", "recieve", "speling", "mispell", "world", "Marko", "GitHub"] {
+    for word in ["i", "im", "i'm", "ive", "doesnt", "dont", "didnt", "cant", "wont", "youre", "ti", "teh", "ths", "mispell", "ill", "well", "were", "its", "world", "Marko", "GitHub"] {
         print("\(word) → \(engine.suggestion(word) ?? "(unchanged)")")
     }
 } else {

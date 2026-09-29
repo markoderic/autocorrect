@@ -62,7 +62,7 @@ public enum CorrectionPolicy {
         }
         guard start < end else { return nil }
         let word = String(prefix[start..<end])
-        guard isPlainWord(word),
+        guard (word == "i" || (word == "I" && caseExceptions.contains("i")) || isPlainWord(word)),
               hasSafeCase(word) || caseExceptions.contains(UserDictionary.normalizedKey(word)) else { return nil }
         return CorrectionCandidate(original: word, range: NSRange(start..<end, in: text))
     }

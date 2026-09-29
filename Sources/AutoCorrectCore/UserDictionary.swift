@@ -19,9 +19,9 @@ public struct UserDictionary: Equatable, Sendable {
         for (offset, line) in lines(ignoredText).enumerated() {
             let word = line.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !word.isEmpty else { continue }
-            guard isWord(word, length: 2...32) else {
+            guard word.lowercased() == "i" || isWord(word, length: 2...32) else {
                 throw ValidationError(section: .ignoredWords, line: offset + 1,
-                                      reason: "Enter one word of 2–32 letters, with at most one interior apostrophe.")
+                                      reason: "Enter one word of 2–32 letters (or i), with at most one interior apostrophe.")
             }
             ignoredWords.insert(normalizedKey(word))
         }
@@ -38,9 +38,9 @@ public struct UserDictionary: Equatable, Sendable {
             }
             let source = parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
             let replacement = parts[1].trimmingCharacters(in: .whitespacesAndNewlines)
-            guard isWord(source, length: 2...32) else {
+            guard source.lowercased() == "i" || isWord(source, length: 2...32) else {
                 throw ValidationError(section: .corrections, line: offset + 1,
-                                      reason: "The typo must be one word of 2–32 letters, with at most one interior apostrophe.")
+                                      reason: "The typo must be one word of 2–32 letters (or i), with at most one interior apostrophe.")
             }
             guard isWord(replacement, length: 1...64) else {
                 throw ValidationError(section: .corrections, line: offset + 1,

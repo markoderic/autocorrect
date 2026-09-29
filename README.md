@@ -4,10 +4,11 @@ A small native macOS menu bar app that corrects spelling when you finish typing 
 
 Requires **macOS 13 Ventura or later**, on Apple silicon or Intel.
 
-**0.2.1 is a preview.** Unit tests, universal packaging, local launch, and login registration have been checked. Compatibility with individual editors and underline placement still need real keyboard testing; see [validation](docs/VALIDATION.md).
+**0.2.2 is a preview.** Unit tests, universal packaging, local launch, and login registration have been checked. Compatibility with individual editors and underline placement still need real keyboard testing; see [validation](docs/VALIDATION.md).
 
 ## What it does
 
+- English writing rules capitalize standalone `i`, repair `im → I'm` and common missing apostrophes (`doesnt → doesn't`, `dont → don't`), and correct `ti → it`. Ignored words and custom corrections override these defaults. Ambiguous words such as `ill`, `well`, `were`, and `its` are left to the spelling checker.
 - **Automatic mode:** replaces a misspelled word after a supported word boundary, such as a space.
 - **Approval mode:** offers a correction through the menu bar so you can decide whether to apply it. Suggestions expire after 30 seconds and are canceled by your next key press.
 - Undo the most recent correction from the menu bar immediately, before your next key press or the 30-second timeout.
@@ -20,11 +21,11 @@ Requires **macOS 13 Ventura or later**, on Apple silicon or Intel.
 - Uses read-only macOS Accessibility to check the field, then native keyboard input to correct it without temporarily selecting the word.
 - Runs in the background without a Dock icon. Settings opens only when requested.
 
-This release handles **spelling**, not grammar, tone, or rewriting. Apple's dictionaries cover common and uncommon words, but are not an exhaustive list of every English word, name, or technical term. Short missing-letter typos now use native-ranked suggestions too: for example, `ths → this` and `frm → from`. These are general edit rules, not a fixed list of typos; ambiguous words can still be wrong or left unchanged. A misspelling without a reliable automatic correction is flagged for review when supported; no correction is guaranteed for every word.
+This release handles **spelling and a small set of English writing rules**. It does not provide sentence-level grammar, tone, or rewriting. Apple's dictionaries cover common and uncommon words, but are not an exhaustive list of every English word, name, or technical term. Short missing-letter typos now use native-ranked suggestions too: for example, `ths → this` and `frm → from`. These are general edit rules, not a fixed list of typos; ambiguous words can still be wrong or left unchanged. A misspelling without a reliable automatic correction is flagged for review when supported; no correction is guaranteed for every word.
 
 ## Install
 
-Download `AutoCorrect-0.2.1-universal.zip` from [Releases](https://github.com/markoderic/autocorrect/releases), unzip it, and move **AutoCorrect.app** to **Applications**. Open it and look for its menu bar item.
+Download `AutoCorrect-0.2.2-universal.zip` from [Releases](https://github.com/markoderic/autocorrect/releases), unzip it, and move **AutoCorrect.app** to **Applications**. Open it and look for its menu bar item.
 
 Release builds are **ad-hoc signed and not Apple notarized**. macOS may block the first launch of a downloaded copy. If you trust the source, attempt to open the app, then go to **System Settings → Privacy & Security → Open Anyway** and confirm. Follow the macOS instructions shown for your version. You do not need to disable Gatekeeper.
 
@@ -75,8 +76,8 @@ The build script compiles **arm64 and x86_64**, combines them into a universal e
 
 ```text
 dist/AutoCorrect.app
-dist/AutoCorrect-0.2.1-universal.zip
-dist/AutoCorrect-0.2.1-universal.zip.sha256
+dist/AutoCorrect-0.2.2-universal.zip
+dist/AutoCorrect-0.2.2-universal.zip.sha256
 ```
 
 It can be called from any working directory. The installer uses `/Applications` when writable, otherwise `~/Applications`. Use `--user` to choose `~/Applications`, `--no-open` to install without launching, and `--replace` to replace an existing installation. Quit AutoCorrect before replacing it; the installer preserves the previous bundle alongside the new one.
@@ -115,3 +116,7 @@ Turn off launch at login, quit AutoCorrect from the menu bar, and remove the app
 ## License
 
 [MIT](LICENSE) · Copyright © 2026 Marko Deric
+
+## What 1.0 means
+
+The 0.x version marks a preview, not a paid tier or a percentage of completion. Before 1.0, the project needs a larger English regression corpus (including contractions, capitalization, punctuation, short typos, valid words, and user dictionaries), verified real-keyboard behavior in a stated list of native and browser editors, rapid-typing and focus-change tests with no text loss, working approval/undo, measured active/idle resource use, and a dependable signed/notarized install and update process. The exact desktop chat composer has not yet been independently verified. A version number alone cannot establish reliability, and 1.0 will not promise every English word or every application.

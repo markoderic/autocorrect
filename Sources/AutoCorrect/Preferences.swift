@@ -1,7 +1,9 @@
 import AppKit
 
 final class Preferences {
-    private let defaults = UserDefaults.standard
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) { self.defaults = defaults }
     var enabled: Bool {
         get { defaults.object(forKey: "enabled") as? Bool ?? true }
         set { defaults.set(newValue, forKey: "enabled") }

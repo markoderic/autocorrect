@@ -1,3 +1,16 @@
+# 0.2.2 validation
+
+Checked September 29, 2026 on Apple silicon, macOS 26.6, Swift 6.4.
+
+- All 45 tests passed, 0 failures. Added English writing-rule tests, candidate-to-replacement-plan tests preserving the next word, and actual CorrectionEngine integration tests with isolated preferences. Ignored words and custom corrections take precedence, including a parsed single-letter `i` entry.
+- Native spelling smoke checks now return `i → I`, `im → I'm`, `i'm → I'm`, `ive → I've`, `doesnt → doesn't`, `dont → don't`, `didnt → didn't`, `cant → can't`, `wont → won't`, `youre → you're`, and `ti → it`. Existing `teh`, `ths`, and `mispell` samples still correct. `ill`, `well`, `were`, `its`, `world`, `Marko`, and `GitHub` remain unchanged.
+- The new conventional writing rules apply only to English, preserve initial capitalization, and skip acronyms/mixed-case tokens. `ti`, `cant`, and `wont` are intentional prose defaults even where a dictionary has another meaning; users can ignore or override them. This is not a sentence-level grammar engine.
+- Universal arm64/x86_64 build and strict signature verification passed. ZIP: 200,409 bytes. SHA-256: `06f276032181dad551ad5cf2154e787fc40a1bb1414d216d31eeff6857f6bdbc`.
+- The keyboard replacement transport is unchanged from 0.2.1. Automated tests are not a physical-keyboard test of the current desktop chat composer; the previous direct-automation restriction still applies. No app exclusions were added.
+- README now states the remaining 1.0 requirements rather than treating a version-number change as proof of readiness.
+
+---
+
 # 0.2.1 validation
 
 Checked September 29, 2026 on Apple silicon, macOS 26.6, Swift 6.4.
