@@ -120,7 +120,29 @@ public enum CorrectionPolicy {
            let replacement = validatedReplacement(for: original, suggestion: systemCorrection, allowShortInsertion: true) {
             return replacement
         }
+        if let native = broaderNativeReplacement(for: original, systemCorrection: systemCorrection, guesses: guesses) {
+            return native
+        }
         return rankedGuessReplacement(for: original, systemCorrection: systemCorrection, guesses: guesses)
+    }
+
+    /// Native automatic recommendation plus first-guess agreement permits two edits
+    /// in ordinary 5+ letter words, including missing letters and damaged endings.
+    /// A strictly closer alternative still blocks this broader fallback.
+    private static func broaderNativeReplacement(for original: String, systemCorrection: String?, guesses: [String]) -> String? {
+        guard original.count >= 5, let proposed = systemCorrection,
+              isPlainWord(proposed), hasSafeCase(proposed),
+              original.first?.isUppercase == true || proposed.first?.isUppercase != true,
+              guesses.first.map(UserDictionary.normalizedKey) == UserDictionary.normalizedKey(proposed) else { return nil }
+        let source = Array(UserDictionary.normalizedKey(original))
+        let target = UserDictionary.normalizedKey(proposed)
+        let distance = editDistance(source, Array(target))
+        guard distance == 2, distance * 5 <= source.count * 2,
+              !guesses.prefix(5).dropFirst().contains(where: {
+                  let other = UserDictionary.normalizedKey($0)
+                  return other != target && editDistance(source, Array(other)) < distance
+              }) else { return nil }
+        return original.first?.isUppercase == true ? target.prefix(1).uppercased() + target.dropFirst() : target
     }
 
     private static func rankedGuessReplacement(for original: String, systemCorrection: String?, guesses: [String]) -> String? {

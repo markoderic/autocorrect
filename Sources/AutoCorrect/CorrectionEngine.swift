@@ -226,10 +226,12 @@ final class CorrectionEngine {
         return candidate
     }
 
-    private func showSuggestion(_ proposal: Proposal) {
-        pending = proposal
+    func showSuggestion(_ proposal: Proposal) {
+        // Automatic mode must never silently turn into review mode for a weak guess.
+        // Keep its visual indication, but only create an approval action when requested.
+        pending = preferences.asksBeforeCorrecting ? proposal : nil
         flaggedWord = proposal.original
-        status = "Suggestion ready"
+        status = preferences.asksBeforeCorrecting ? "Suggestion ready" : "Possible misspelling: \(proposal.original)"
         if preferences.showsSpellingIndicators { indicator.show(snapshot: proposal.snapshot, range: proposal.range) }
         onChange?()
     }
@@ -265,10 +267,10 @@ final class CorrectionEngine {
                 }
             }
         }
-        if output.last != ".", output.last != ":", let context = contextualCandidate(in: output) {
+        if preferences.asksBeforeCorrecting, output.last != ".", output.last != ":", let context = contextualCandidate(in: output) {
             return (output as NSString).replacingCharacters(in: context.range, with: context.replacement) + " (approval required)"
         }
-        return output == completed ? nil : output
+        return output == completed ? nil : output + (preferences.asksBeforeCorrecting ? " (approval required)" : "")
     }
 
     func suggestion(_ word: String) -> String? {

@@ -1,3 +1,17 @@
+# 0.3.5 validation
+
+Checked September 29, 2026 on the development Mac.
+
+- **134 automated tests passed, 0 failures.** New tests cover question/exclamation/mixed endings, quotes and brackets, full typing previews, single-letter capitalization, joined-word sentence starts, product casing, feature-off behavior, ignored/custom overrides, six broader native spelling repairs, and actual pending-proposal state in automatic versus review mode. Existing edit, undo, manual rewrite, and structured-token checks remain in the suite.
+- Capitalization now recognizes `.`, `?`, and `!` before whitespace and capitalizes the next completed word. The stored preference key is unchanged, preserving the user's toggle. Existing period abbreviation/decimal/URL guards remain. This does not capitalize immediately on the first keystroke of the new word.
+- A native automatic recommendation matching its first guess can now repair two edits in words of at least five letters (at most 40 percent of the source length). A strictly closer top-five alternative blocks this fallback; equal-distance alternatives no longer block it when both native signals agree. This is a deliberate coverage tradeoff, not a measured general accuracy increase.
+- Automatic mode never creates a pending approval proposal for weak guesses. They retain an optional underline and menu indication. Ask Before Correcting still creates a proposal, and previews identify approval mode. No unreliable guess is blindly applied solely to eliminate the approval UI.
+- Universal Intel/Apple silicon compilation and exact-archive signature, architecture, and license checks passed. ZIP size: 1,604,280 bytes. SHA-256: `26826d8a8b38129882dbfceba6c57744d285cb0ac30612386f2a5b6b06df9e43`. Public archive remains ad-hoc signed and not notarized.
+- Installed 0.3.5 with the existing development signing identity and confirmed the running process. Installed diagnostics report Accessibility, Input Monitoring, supported layout, keyboard-listener capability, and enabled login registration. Fixed installed probes confirm question/exclamation capitalization and the broader spelling examples. Ask Before Correcting is off and sentence capitalization is on in the existing preferences.
+- No new physical-keyboard or all-editor overlay validation is claimed. Tests verify the policies and menu state, not every host app's event handling or dictionary behavior on every macOS release.
+
+---
+
 # 0.3.4 validation
 
 Checked September 29, 2026 on the development Mac.

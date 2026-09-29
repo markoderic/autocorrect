@@ -35,7 +35,7 @@ extension JoinedWordsTests {
         XCTAssertNotEqual(engine.suggestion("iknow"), "I know")
         prefs.separatesJoinedWords = true
         prefs.asksBeforeCorrecting = true
-        XCTAssertEqual(engine.previewText(in: "iknow "), "I know ")
+        XCTAssertEqual(engine.previewText(in: "iknow "), "I know  (approval required)")
     }
 
     func testPleaseNeedsRequestContext() {

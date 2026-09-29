@@ -163,14 +163,14 @@ final class SettingsController: NSWindowController, NSTableViewDataSource, NSTab
         body.addArrangedSubview(card([label("Spelling language", weight: .semibold), language]))
         body.addArrangedSubview(card([
             toggle("Ask before correcting", value: preferences.asksBeforeCorrecting, action: #selector(setApproval(_:))),
-            label("Review suggestions from the menu bar before they change your text.", size: 12, secondary: true),
+            label("Off: clear corrections apply automatically; uncertain words are only underlined. On: review suggestions in the menu bar.", size: 12, secondary: true),
             toggle("Check surrounding context", value: preferences.checksContext, action: #selector(setContext(_:))),
-            label("Fix clear its/it’s and lets/let’s contexts after nearby words are complete. Uncertain changes need approval.", size: 12, secondary: true)
+            label("Fix clear its/it’s and lets/let’s contexts after nearby words are complete. Uncertain changes are only underlined in automatic mode.", size: 12, secondary: true)
         ]))
         body.addArrangedSubview(card([
             toggle("Fix missing spaces", value: preferences.separatesJoinedWords, action: #selector(setJoinedWords(_:))),
             label("Separate clear two-word combinations such as iknow and thankyou.", size: 12, secondary: true),
-            toggle("Capitalize after a period", value: preferences.capitalizesAfterPeriod, action: #selector(setCapitals(_:))),
+            toggle("Capitalize after . ? !", value: preferences.capitalizesAfterPeriod, action: #selector(setCapitals(_:))),
             toggle("Show spelling underlines", value: preferences.showsSpellingIndicators, action: #selector(setUnderlines(_:))),
             label("Marks the latest possible misspelling where the editor exposes its position. Other apps’ spelling settings stay unchanged.", size: 12, secondary: true)
         ]))

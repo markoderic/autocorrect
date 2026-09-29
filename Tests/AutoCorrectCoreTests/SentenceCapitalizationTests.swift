@@ -15,6 +15,17 @@ final class SentenceCapitalizationTests: XCTestCase {
         XCTAssertEqual(SentenceCapitalization.replacement(for: "next"), "Next")
     }
 
+    func testQuestionsExclamationsAndMixedEndings() {
+        for text in ["Really? next ", "Great! next ", "Really?! next ", "Great!! next ", "Why?? next ",
+                     "Why? \"next ", "(Yes!) next ", "Why?\nnext ", "I? next "] {
+            XCTAssertEqual(candidate(text)?.original, "next", text)
+        }
+        for text in ["https://example.com? next ", "file.txt! next ", "var!=x! next ", "Why?next "] {
+            XCTAssertNil(candidate(text), text)
+        }
+        XCTAssertEqual(SentenceCapitalization.replacement(for: "my friend"), "My friend")
+    }
+
     func testSingleLetterWordsAreIndependentOfSpellingCandidateMinimum() {
         XCTAssertEqual(candidate("Hello. i ")?.original, "i")
         XCTAssertEqual(candidate("Hello. a ")?.original, "a")
@@ -37,8 +48,8 @@ final class SentenceCapitalizationTests: XCTestCase {
         }
     }
 
-    func testRequiresExactPeriodWhitespaceAndCompletedLowercaseWord() {
-        for text in ["next ", "Hello next ", "Hello.next ", "Hello! next ", "Hello? next ",
+    func testRequiresSentenceEndWhitespaceAndCompletedLowercaseWord() {
+        for text in ["next ", "Hello next ", "Hello.next ",
                      "Hello. next", "Hello. Next ", "Hello. NEXT ", "Hello. next\n", "Hello. next\t", "Hello. next  "] {
             XCTAssertNil(candidate(text), text)
         }

@@ -4,9 +4,9 @@ Autocorrect that keeps up with your typing. A small Mac menu bar app that fixes 
 
 ## Download and install
 
-<a href="https://github.com/markoderic/autocorrect/releases/download/v0.3.4/AutoCorrect-0.3.4-universal.zip"><img src="docs/media/download-macos.svg" alt="Download AutoCorrect for macOS" width="296" height="56"></a>
+<a href="https://github.com/markoderic/autocorrect/releases/download/v0.3.5/AutoCorrect-0.3.5-universal.zip"><img src="docs/media/download-macos.svg" alt="Download AutoCorrect for macOS" width="296" height="56"></a>
 
-[Download ZIP](https://github.com/markoderic/autocorrect/releases/download/v0.3.4/AutoCorrect-0.3.4-universal.zip) · **macOS 13 or later** · Apple silicon and Intel · [v0.3.4 preview](https://github.com/markoderic/autocorrect/releases/tag/v0.3.4)
+[Download ZIP](https://github.com/markoderic/autocorrect/releases/download/v0.3.5/AutoCorrect-0.3.5-universal.zip) · **macOS 13 or later** · Apple silicon and Intel · [v0.3.5 preview](https://github.com/markoderic/autocorrect/releases/tag/v0.3.5)
 
 1. **Download** using the button above, then double-click the ZIP to unzip it.
 2. **Drag AutoCorrect.app into Applications**, then open it from there.
@@ -46,14 +46,13 @@ Then open **AutoCorrect** from **Applications** and follow steps 3–4 above. Th
 
 **This is an early release.** App compatibility varies; it cannot correct text in every app or field. See [validation and known limits](docs/VALIDATION.md).
 
-## What changed in 0.3.4
+## What changed in 0.3.5
 
-- **Missing spaces:** clear two-word combinations such as `iknow → I know`, `thankyou → thank you`, `inthe → in the`, and `myfriend → my friend`. A new **Fix missing spaces** setting controls automatic splitting. Valid dictionary words, recognized technical names, filenames, ignored words, and custom replacements retain priority. This is bounded local segmentation, not unrestricted sentence reconstruction.
-- **Smart apostrophes:** repairs can now be applied when a host editor turns an apostrophe curly, including `doen’st → doesn't`. Straight-apostrophe variants remain covered. Undo preserves following text.
-- **Contextual please:** `pleas help → please help` after the following word completes. Standalone `pleas` and the valid plural in `their pleas were heard` remain unchanged.
-- **Underline compatibility:** use character bounds when whole-word bounds are unavailable, or whole-word bounds plus matching line indices when character bounds are unavailable. Unsupported or wrapped geometry is still skipped instead of drawing in the wrong place.
+- **Capitalize after . ? !:** the next completed word is capitalized after questions and exclamations too, including `?!`, quotes, and brackets. `Really? hello ` becomes `Really? Hello `. The existing capitalization toggle now covers all three endings.
+- **More automatic corrections:** native automatic recommendations that also rank first can repair two edits in 5+ letter words, including `finnaly → finally`, `probly → probably`, `beutifl → beautiful`, and `buisnes → business`. A strictly closer alternative still blocks this broader fallback.
+- **Automatic mode stays automatic:** uncertain words get a spelling indication without an approval action. Only turning on **Ask Before Correcting** creates approval requests. Ignored words, custom rules, manual rewrites, compound/name protection, and undo retain their existing behavior.
 
-The previous release's 6,231 recognition terms and 2,234 canonical name entries remain included. These counts are dictionary sizes, **not an accuracy score**. [Research and limitations](docs/SPACING-AND-UNDERLINES.md) · [Test evidence](docs/VALIDATION.md).
+Missing-space repairs, smart-apostrophe editing, and partial Accessibility geometry support from 0.3.4 remain included. [Test evidence](docs/VALIDATION.md) · [Underline limitations](docs/SPACING-AND-UNDERLINES.md).
 
 ## See it in action
 
@@ -63,7 +62,7 @@ The previous release's 6,231 recognition terms and 2,234 canonical name entries 
 
 ## What it does
 
-- English writing rules capitalize standalone `i`, repair `im → I'm` and common missing apostrophes (`doesnt → doesn't`, `dont → don't`), and correct `ti → it`. Ignored words and custom corrections override these defaults. Valid ambiguous words such as `ill`, `well`, and `were` are preserved. Nearby-word rules now automatically fix clearer `its/it’s` and `lets/let’s` contexts; uncertain changes still require approval.
+- English writing rules capitalize standalone `i`, repair `im → I'm` and common missing apostrophes (`doesnt → doesn't`, `dont → don't`), and correct `ti → it`. Ignored words and custom corrections override these defaults. Valid ambiguous words such as `ill`, `well`, and `were` are preserved. Nearby-word rules now automatically fix clearer `its/it’s` and `lets/let’s` contexts; uncertain changes are only indicated in automatic mode.
 - Built-in abbreviation expansions: `idk → I don't know`, `omw → On my way`, `brb → Be right back`, `imo → in my opinion`, and `fyi → for your information`. Product/acronym casing includes `iphone → iPhone`, `ui → UI`, `ux → UX`, `api → API`, and `macos → macOS`, and `github → GitHub`. A uniquely matching one-edit typo in a longer known product name can be repaired too (`iphoen → iPhone`, `githbu → GitHub`), after the native dictionary marks it misspelled. Both groups have independent switches in Text Replacements. Ignoring a shortcut disables it individually.
 - **Automatic mode:** replaces a misspelled word after a supported word boundary, such as a space. A period or colon waits for the next delimiter to avoid changing a filename or URL before it is complete.
 - **Approval mode:** offers a correction through the menu bar so you can decide whether to apply it. Suggestions expire after 30 seconds and are canceled by your next key press.
@@ -72,15 +71,15 @@ The previous release's 6,231 recognition terms and 2,234 canonical name entries 
 - A compact, vertically centered letter/checkmark menu bar icon and a native app window with Overview, Writing, Text Replacements, Ignored Words, and Apps. To pause one app, open that app, then choose **AutoCorrect → Pause in [app]**. Choose **Resume in [app]** to turn it back on. The Paused Apps submenu only lists apps installed on your Mac.
 - **Settings → Ignored Words:** add names or words that should never be corrected or marked. Remove a word to check it again. Matching ignores capitalization.
 - **Settings → Text Replacements:** choose a typed shortcut and its replacement phrase (up to 120 characters), including exact capitalization. Add the same typed word again to update it. Ignored words take precedence over custom corrections.
-- **Settings → Writing → Capitalize after a period:** enabled by default. Capitalizes the next completed word when you type its space or punctuation (`Done. hello ` → `Done. Hello `). Turn it off independently of spelling correction. Common abbreviations, initials, decimals, URLs, and ambiguous period endings are skipped. Ignored words and exact custom replacements keep priority.
-- **Fix missing spaces:** automatically separate clear two-word combinations; turn this off to review them instead.
+- **Settings → Writing → Capitalize after . ? !:** enabled by default. Capitalizes the next completed word when you type its space or punctuation (`Done. hello ` → `Done. Hello `, `Really? hello ` → `Really? Hello `). Turn it off independently of spelling correction. Common abbreviations, initials, decimals, URLs, and ambiguous period endings are skipped. Ignored words and exact custom replacements keep priority.
+- **Fix missing spaces:** automatically separate clear two-word combinations; turn this off to stop automatic splitting.
 - **Show Spelling Underlines:** optionally draw a red wavy underline beneath the latest completed possible misspelling. This requires the host app to expose the word's on-screen bounds. It clears on typing, clicking, scrolling, app switching, or after five seconds. It does not continuously mark the whole document. AutoCorrect does not change other apps’ native spelling-underline settings; macOS has no verified universal live switch for those controls.
-- English (US) is the default; the language selector is in Settings. Uncertain dictionary suggestions require approval even in automatic mode.
+- English (US) is the default; the language selector is in Settings. Uncertain dictionary suggestions are underlined without approval prompts in automatic mode. Turn on Ask Before Correcting to review suggestions.
 - Automatically requests launch at login on first launch; you can turn it off in the menu bar.
 - Uses read-only macOS Accessibility to check the field, then native keyboard input to correct it without temporarily selecting the word.
 - Runs in the background without a Dock icon. Settings opens only when requested.
 
-This release handles **spelling, text expansion, capitalization, and a narrow set of contextual English suggestions**. It does not provide comprehensive grammar, tone, or rewriting. Apple's dictionaries cover common and uncommon words, but are not an exhaustive list of every English word, name, or technical term. Short missing-letter typos now use native-ranked suggestions too: for example, `ths → this` and `frm → from`. Longer misspellings can use the first native-ranked guess, with edit-distance and ambiguity checks (`capitazed → capitalized` on the development Mac). These are general edit rules, not a fixed list of typos; ambiguous words can still be wrong or left unchanged. If the native top suggestion only separates the exact typed letters with a space or hyphen, the app offers that for review instead of automatically substituting a different word (`homebrew` no longer automatically becomes `homebred`). A misspelling without a reliable automatic correction is flagged for review when supported; no correction is guaranteed for every word.
+This release handles **spelling, text expansion, capitalization, and a narrow set of contextual English suggestions**. It does not provide comprehensive grammar, tone, or rewriting. Apple's dictionaries cover common and uncommon words, but are not an exhaustive list of every English word, name, or technical term. Short missing-letter typos now use native-ranked suggestions too: for example, `ths → this` and `frm → from`. Longer misspellings can use the first native-ranked guess, with edit-distance and ambiguity checks (`capitazed → capitalized` on the development Mac). These are general edit rules, not a fixed list of typos; ambiguous words can still be wrong or left unchanged. If the native top suggestion only separates the exact typed letters with a space or hyphen, the app avoids automatically substituting a different word (`homebrew` no longer automatically becomes `homebred`). A misspelling without a reliable automatic correction is visually flagged when supported; no correction is guaranteed for every word.
 
 ## Compatibility and privacy
 
@@ -107,8 +106,8 @@ The build script compiles **arm64 and x86_64**, combines them into a universal e
 
 ```text
 dist/AutoCorrect.app
-dist/AutoCorrect-0.3.4-universal.zip
-dist/AutoCorrect-0.3.4-universal.zip.sha256
+dist/AutoCorrect-0.3.5-universal.zip
+dist/AutoCorrect-0.3.5-universal.zip.sha256
 ```
 
 It can be called from any working directory. The installer uses `/Applications` when writable, otherwise `~/Applications`. Use `--user` to choose `~/Applications`, `--no-open` to install without launching, and `--replace` to replace an existing installation. Quit AutoCorrect before replacing it; the installer preserves the previous bundle alongside the new one.

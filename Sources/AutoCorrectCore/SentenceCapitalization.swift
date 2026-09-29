@@ -1,11 +1,11 @@
 import Foundation
 
-/// Identifies a completed prose word after an unambiguous sentence-ending period.
+/// Identifies a completed prose word after an unambiguous sentence ending.
 /// The caller owns the feature toggle, ignored/custom rules, and focused-field validation.
 public enum SentenceCapitalization {
     /// Returns the word to capitalize, including a single-letter word such as "i" or "a".
     /// `caret` and the returned range use UTF-16 offsets, matching Accessibility APIs.
-    /// A period followed by whitespace is required; document starts and ! / ? do not qualify.
+    /// A sentence-ending period, question mark, or exclamation followed by whitespace is required.
     public static func candidate(in text: String, caret: Int) -> CorrectionCandidate? {
         guard caret > 0, caret <= text.utf16.count,
               let caretRange = Range(NSRange(location: caret, length: 0), in: text) else { return nil }
@@ -34,14 +34,16 @@ public enum SentenceCapitalization {
         let word = String(prefix[start..<end])
         guard isWord(word, maximumLength: 32), word.first?.isLowercase == true,
               !word.dropFirst().contains(where: { $0.isUppercase }),
-              followsSentencePeriod(in: prefix, wordStart: start) else { return nil }
+              followsSentenceEnd(in: prefix, wordStart: start) else { return nil }
         return CorrectionCandidate(original: word, range: NSRange(start..<end, in: text))
     }
 
     /// Capitalizes only the first letter; the remaining spelling and casing are preserved.
     /// This can also be applied to a spelling correction selected for an eligible candidate.
     public static func replacement(for word: String) -> String? {
-        guard isWord(word, maximumLength: 64), let first = word.first, first.isLowercase else { return nil }
+        guard word.count <= 120, !word.isEmpty,
+              word.split(separator: " ", omittingEmptySubsequences: false).allSatisfy({ isWord(String($0), maximumLength: 64) }),
+              let first = word.first, first.isLowercase else { return nil }
         return String(first).uppercased() + word.dropFirst()
     }
 
@@ -57,7 +59,7 @@ public enum SentenceCapitalization {
         "jan", "feb", "mar", "apr", "jun", "jul", "aug", "sep", "sept", "oct", "nov", "dec"
     ]
 
-    private static func followsSentencePeriod(in prefix: Substring, wordStart: String.Index) -> Bool {
+    private static func followsSentenceEnd(in prefix: Substring, wordStart: String.Index) -> Bool {
         var cursor = wordStart
         while cursor > prefix.startIndex, openingQuotesAndBrackets.contains(prefix[prefix.index(before: cursor)]) {
             cursor = prefix.index(before: cursor)
@@ -71,8 +73,16 @@ public enum SentenceCapitalization {
             cursor = prefix.index(before: cursor)
         }
         guard cursor > prefix.startIndex else { return false }
-        let period = prefix.index(before: cursor)
-        guard prefix[period] == ".", period > prefix.startIndex else { return false }
+        var period = prefix.index(before: cursor)
+        guard ".!?".contains(prefix[period]), period > prefix.startIndex else { return false }
+        let emphatic = prefix[period] == "!" || prefix[period] == "?"
+        if emphatic {
+            // Treat ?!, !!, and ?? as one ending, but still reject paths/URLs/code
+            // in the preceding token rather than mistaking their punctuation for prose.
+            while period > prefix.startIndex, "!?".contains(prefix[prefix.index(before: period)]) {
+                period = prefix.index(before: period)
+            }
+        }
         // Dotted initials, domains, decimal numbers, paths, and ellipses fail the plain-word check.
         var tokenStart = period
         var count = 0
@@ -86,8 +96,8 @@ public enum SentenceCapitalization {
         var preceding = String(prefix[tokenStart..<period])
         while let first = preceding.first, openingQuotesAndBrackets.contains(first) { preceding.removeFirst() }
         while let last = preceding.last, closingQuotesAndBrackets.contains(last) { preceding.removeLast() }
-        guard isWord(preceding, maximumLength: 64), preceding.count > 1 else { return false }
-        return !abbreviations.contains(UserDictionary.normalizedKey(preceding))
+        guard isWord(preceding, maximumLength: 64), emphatic || preceding.count > 1 else { return false }
+        return emphatic || !abbreviations.contains(UserDictionary.normalizedKey(preceding))
     }
 
     private static func isWhitespace(_ character: Character) -> Bool {
