@@ -41,6 +41,10 @@ final class AutomaticModeTests: XCTestCase {
     func testMoreNativeCorrectionsApplyAutomatically() {
         for (word, replacement) in ["finnaly": "finally", "probly": "probably", "beutifl": "beautiful",
                                     "tomoroww": "tomorrow", "buisnes": "business", "necesry": "necessary"] {
+            var actual = "no native assessment"
+            engine.nativeAssessmentObserver = { language, miss, correction, guesses in
+                actual = "language=\(language) miss=\(miss) correction=\(correction ?? "nil") guesses=\(guesses)"
+            }
             let result = engine.suggestion(word)
             let checker = NSSpellChecker.shared
             let range = NSRange(location: 0, length: word.utf16.count)
@@ -48,7 +52,7 @@ final class AutomaticModeTests: XCTestCase {
             let native = checker.correction(forWordRange: range, in: word, language: "en_US", inSpellDocumentWithTag: 0)
             let guesses = checker.guesses(forWordRange: range, in: word, language: "en_US", inSpellDocumentWithTag: 0)
             let policy = CorrectionPolicy.preferredAutomaticReplacement(for: word, systemCorrection: native, guesses: guesses ?? [])
-            XCTAssertEqual(result, replacement, "\(word); miss=\(miss); policy=\(policy ?? "nil"); native=\(native ?? "nil"); guesses=\(guesses ?? []); recognized=\(NameLexicon.recognizes(word))")
+            XCTAssertEqual(result, replacement, "\(word); miss=\(miss); policy=\(policy ?? "nil"); native=\(native ?? "nil"); guesses=\(guesses ?? []); recognized=\(NameLexicon.recognizes(word)); actual=\(actual)")
         }
         XCTAssertNil(engine.suggestion("homebrew"))
         XCTAssertNil(engine.suggestion("har"))

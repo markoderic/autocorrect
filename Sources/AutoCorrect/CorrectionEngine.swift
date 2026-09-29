@@ -26,9 +26,10 @@ final class CorrectionEngine {
     private var attemptedBoundaries: [UInt64: Int] = [:]
     private var manualRewrites = ManualRewriteProtection()
     private var rewriteField: (pid: pid_t, element: AXUIElement, id: UUID)?
-    // Each query is a bounded snapshot from potentially different apps/fields, not
-    // one persistent document. Apple's documented tag 0 is for unassociated text.
-    private let spellDocument = 0
+    private let spellDocument = NSSpellChecker.uniqueSpellDocumentTag()
+    #if DEBUG
+    var nativeAssessmentObserver: ((String, Bool, String?, [String]) -> Void)?
+    #endif
     private struct Assessment {
         let misspelled: Bool
         let replacement: String?
@@ -313,6 +314,9 @@ final class CorrectionEngine {
         let misspelled = checker.checkSpelling(of: word, startingAt: 0, language: preferences.language, wrap: false, inSpellDocumentWithTag: spellDocument, wordCount: nil)
         var answer = Assessment(misspelled: false, replacement: nil, automatic: false)
         let nativeMisspelled = misspelled.location != NSNotFound
+        #if DEBUG
+        nativeAssessmentObserver?(preferences.language, nativeMisspelled, nil, [])
+        #endif
         if preferences.normalizesProductNames,
            let canonical = NameLexicon.canonicalReplacement(for: word, nativeMisspelled: nativeMisspelled) {
             return Assessment(misspelled: true, replacement: canonical, automatic: true)
@@ -323,6 +327,9 @@ final class CorrectionEngine {
         if nativeMisspelled {
             let proposed = checker.correction(forWordRange: wordRange, in: text, language: preferences.language, inSpellDocumentWithTag: spellDocument)
             let guesses = checker.guesses(forWordRange: wordRange, in: text, language: preferences.language, inSpellDocumentWithTag: spellDocument) ?? []
+            #if DEBUG
+            nativeAssessmentObserver?(preferences.language, nativeMisspelled, proposed, guesses)
+            #endif
             if let contraction = EnglishWritingRules.typoReplacement(for: word, language: preferences.language,
                                                                      systemCorrection: proposed, guesses: guesses) {
                 return Assessment(misspelled: true, replacement: contraction, automatic: true)
@@ -475,5 +482,5 @@ final class CorrectionEngine {
         onChange?()
     }
 
-    deinit { monitor.stop() }
+    deinit { monitor.stop(); NSSpellChecker.shared.closeSpellDocument(withTag: spellDocument) }
 }
