@@ -7,7 +7,7 @@ cask "autocorrect" do
   desc "Small offline menu bar spelling correction for macOS"
   homepage "https://github.com/markoderic/autocorrect"
 
-  depends_on macos: ">= :ventura"
+  depends_on macos: :ventura
   app "AutoCorrect.app"
 
   caveats <<~EOS

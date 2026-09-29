@@ -6,6 +6,8 @@ Checked September 28, 2026 on Apple silicon, macOS 26.6, Swift 6.4 / Xcode 27 SD
 | --- | --- |
 | Correction policy tests | 9 tests passed, 0 failed; UTF-16, token exclusions, punctuation, capitalization, and confidence rules |
 | Release compilation | arm64 and x86_64 passed |
+| GitHub Actions | Clean hosted macOS build, all policy tests, universal packaging, and artifact upload passed |
+| Homebrew distribution | Project tap installed; published release fetched and its SHA-256 verified successfully |
 | Bundle validation | plist valid; both architectures present; strict code-signature verification passed for clean archive and installed app |
 | Local installation and launch | Installed in /Applications; background process running |
 | Launch at login registration | SMAppService reports enabled; an actual logout/login has not been exercised |
