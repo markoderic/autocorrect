@@ -13,7 +13,15 @@ public enum EnglishWritingRules {
         "youre": "you're", "youve": "you've", "youll": "you'll",
         "theyre": "they're", "theyve": "they've", "theyll": "they'll",
         "weve": "we've", "thats": "that's", "theres": "there's",
-        "whats": "what's", "whos": "who's", "heres": "here's"
+        "whats": "what's", "whos": "who's", "heres": "here's",
+        // Added after native probes: automatic recommendations for several of these are
+        // nil on some macOS versions, and a closer competitor (shed, aunt, till) blocks the
+        // ranked fallback. Each has one conventional reading; hes/shes follow iOS practice.
+        "hes": "he's", "shes": "she's", "itll": "it'll", "itd": "it'd", "youd": "you'd", "theyd": "they'd",
+        "thatll": "that'll", "therell": "there'll", "whatll": "what'll", "whod": "who'd",
+        "wheres": "where's", "whens": "when's",
+        "wouldve": "would've", "couldve": "could've", "shouldve": "should've",
+        "mightve": "might've", "mustve": "must've", "aint": "ain't", "yall": "y'all", "oclock": "o'clock"
     ]
 
     /// Correct a damaged contraction as one operation: a missing apostrophe plus

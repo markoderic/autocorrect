@@ -51,3 +51,36 @@ final class EnglishWritingRulesTests: XCTestCase {
         }
     }
 }
+
+extension EnglishWritingRulesTests {
+    func testAdditionalUnambiguousContractionsAreDeterministic() {
+        // Native automatic recommendations for several of these are nil on some macOS
+        // versions, and a closer competitor (shed, aunt, till) blocks the ranked fallback.
+        for (source, expected) in ["shes": "she's", "hes": "he's", "itll": "it'll", "itd": "it'd",
+            "youd": "you'd", "theyd": "they'd", "thatll": "that'll", "therell": "there'll", "whatll": "what'll",
+            "whod": "who'd", "wheres": "where's", "whens": "when's",
+            "wouldve": "would've", "couldve": "could've", "shouldve": "should've",
+            "mightve": "might've", "mustve": "must've", "aint": "ain't", "yall": "y'all", "oclock": "o'clock",
+            "Shes": "She's", "Aint": "Ain't", "Wouldve": "Would've"] {
+            XCTAssertEqual(EnglishWritingRules.replacement(for: source, language: "en_US"), expected, source)
+        }
+    }
+
+    func testAmbiguousShortFormsAndRealWordsStayOutOfTheContractionTable() {
+        // hed/wed/well/shell/hell/ill/id can be other words or typos of other words;
+        // hows/whys appear in "the hows and whys"; wholl/whove are more often other typos.
+        for word in ["hed", "wed", "well", "shell", "hell", "ill", "id", "hows", "whys", "wholl", "whove",
+                     "SHES", "sheS", "she's", "ain't", "y'all"] {
+            XCTAssertNil(EnglishWritingRules.replacement(for: word, language: "en_US"), word)
+        }
+    }
+
+    func testDamagedFormsOfNewContractionsRepairWithNativeAgreementOrPreservedLetters() {
+        XCTAssertEqual(EnglishWritingRules.typoReplacement(for: "shoudlve", language: "en_US",
+            systemCorrection: nil, guesses: []), "should've")
+        XCTAssertEqual(EnglishWritingRules.typoReplacement(for: "wouldv", language: "en_US",
+            systemCorrection: "would've", guesses: []), "would've")
+        XCTAssertNil(EnglishWritingRules.typoReplacement(for: "wouldv", language: "en_US",
+            systemCorrection: nil, guesses: ["would", "wouldn't"]))
+    }
+}

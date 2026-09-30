@@ -17,4 +17,28 @@ public enum TypingTypography {
         observed == typed || (isSpace(observed) && isSpace(typed)) ||
             (typed == "\"" && (observed == "“" || observed == "”"))
     }
+
+    /// A host may replace the punctuation we insert with its typographic form (smart
+    /// quotes, nonbreaking spaces). Compare unit by unit; letters and case must match.
+    /// Only the typed-to-smart direction is equivalent, never the reverse.
+    public static func equivalent(observed: String, typed: String) -> Bool {
+        let left = Array(observed.utf16)
+        let right = Array(typed.utf16)
+        guard left.count == right.count else { return false }
+        for (observedUnit, typedUnit) in zip(left, right) where observedUnit != typedUnit {
+            guard let observedScalar = Unicode.Scalar(observedUnit),
+                  let typedScalar = Unicode.Scalar(typedUnit),
+                  sameUnit(Character(observedScalar), Character(typedScalar)) else { return false }
+        }
+        return true
+    }
+
+    private static func sameUnit(_ observed: Character, _ typed: Character) -> Bool {
+        switch typed {
+        case " ": return isSpace(observed)
+        case "\"": return "“”«»".contains(observed)
+        case "'": return "‘’".contains(observed)
+        default: return false
+        }
+    }
 }

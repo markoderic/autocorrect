@@ -1,5 +1,6 @@
 import AppKit
 import ApplicationServices
+import AutoCorrectCore
 
 /// Read-only Accessibility snapshots. Text and selections are never changed through AX.
 enum AccessibilityText {
@@ -157,10 +158,19 @@ enum AccessibilityText {
     }
 
     /// Verification tolerates continued typing after the replaced suffix. It never retries a write.
-    static func verifies(snapshot: Snapshot, expectedText: String, expectedCaret: Int) -> Bool {
+    /// Returns the host's actual text, which may carry its own smart punctuation.
+    static func verifies(snapshot: Snapshot, expectedText: String, expectedCaret: Int) -> String? {
         guard hasFocus(snapshot),
               let selected = range(snapshot.element), selected.length == 0,
-              selected.location >= snapshot.windowStart + expectedCaret else { return false }
-        return substring(snapshot.element, range: CFRange(location: snapshot.windowStart, length: expectedCaret)) == expectedText
+              selected.location >= snapshot.windowStart + expectedCaret else { return nil }
+        return confirmedText(observed: substring(snapshot.element, range: CFRange(location: snapshot.windowStart, length: expectedCaret)),
+                             expected: expectedText)
+    }
+
+    /// Rich hosts (Notes, TextEdit, Mail, Messages, Pages) substitute curly quotes and
+    /// nonbreaking spaces for what we insert. That is still the confirmed correction.
+    static func confirmedText(observed: String?, expected: String) -> String? {
+        guard let observed, TypingTypography.equivalent(observed: observed, typed: expected) else { return nil }
+        return observed
     }
 }

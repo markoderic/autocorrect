@@ -56,3 +56,23 @@ final class TypingTypographyTests: XCTestCase {
         }
     }
 }
+
+extension TypingTypographyTests {
+    func testHostSmartPunctuationSubstitutionIsEquivalentForVerification() {
+        // Rich hosts turn an inserted straight apostrophe or quote into a curly one and
+        // an ordinary space into a nonbreaking one. Verification must accept those.
+        XCTAssertTrue(TypingTypography.equivalent(observed: "it don’t next", typed: "it don't next"))
+        XCTAssertTrue(TypingTypography.equivalent(observed: "“spell” next", typed: "\"spell\" next"))
+        XCTAssertTrue(TypingTypography.equivalent(observed: "«spell» next", typed: "\"spell\" next"))
+        XCTAssertTrue(TypingTypography.equivalent(observed: "spell\u{00A0}next", typed: "spell next"))
+        XCTAssertTrue(TypingTypography.equivalent(observed: "‘spell’ next", typed: "'spell' next"))
+        XCTAssertTrue(TypingTypography.equivalent(observed: "same", typed: "same"))
+        // Letters, case, length and unrelated punctuation must still match exactly.
+        XCTAssertFalse(TypingTypography.equivalent(observed: "it dont next", typed: "it don't next"))
+        XCTAssertFalse(TypingTypography.equivalent(observed: "it Don't next", typed: "it don't next"))
+        XCTAssertFalse(TypingTypography.equivalent(observed: "it don't nex", typed: "it don't next"))
+        XCTAssertFalse(TypingTypography.equivalent(observed: "it don't next ", typed: "it don't next"))
+        XCTAssertFalse(TypingTypography.equivalent(observed: "it don—t next", typed: "it don't next"))
+        XCTAssertFalse(TypingTypography.equivalent(observed: "it don't next", typed: "it don’t next"))
+    }
+}

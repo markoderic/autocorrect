@@ -368,8 +368,16 @@ final class CorrectionEngine {
                 confident = CorrectionPolicy.isolatedFallback(for: word, contextualCorrection: proposed,
                     contextualGuesses: guesses, isolatedCorrection: isolated, isolatedGuesses: isolatedGuesses)
             }
+            // A lower-ranked prose split (as well, a bit, so far) means the typed letters are
+            // two real words. Only a repair that keeps every typed letter may still proceed.
+            var phrase: String?
+            if let repair = confident, let prose = CompoundSpellingPolicy.prosePhrase(for: word, guesses: guesses),
+               !CompoundSpellingPolicy.preservesTypedLetters(of: word, in: repair) {
+                confident = nil
+                phrase = prose
+            }
             // Dictionary guesses can cover larger mistakes, but never apply them without approval.
-            let review = preserveCompound ? guesses.first : (confident ?? proposed ?? guesses.first)
+            let review = preserveCompound ? guesses.first : (confident ?? phrase ?? proposed ?? guesses.first)
             answer = Assessment(misspelled: true, replacement: review, automatic: confident != nil)
         }
         if cache.count >= 256 { cache.removeAll(keepingCapacity: true) }
@@ -444,7 +452,7 @@ final class CorrectionEngine {
                         isUndo: Bool, andIgnore: Bool, protectionID: UUID?, attempt: Int) {
         DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(attempt == 0 ? 40 : 100)) { [weak self] in
             guard let self, self.sessionEpoch == epoch else { return }
-            guard AccessibilityText.verifies(snapshot: proposal.snapshot, expectedText: plan.expectedText, expectedCaret: plan.expectedCaret) else {
+            guard let observed = AccessibilityText.verifies(snapshot: proposal.snapshot, expectedText: plan.expectedText, expectedCaret: plan.expectedCaret) else {
                 if attempt < 2 {
                     self.verify(proposal, plan: plan, epoch: epoch, isUndo: isUndo, andIgnore: andIgnore, protectionID: protectionID, attempt: attempt + 1)
                 } else {
@@ -462,14 +470,15 @@ final class CorrectionEngine {
             self.correctionCount = max(0, self.correctionCount + (isUndo ? -1 : 1))
             if andIgnore { self.preferences.ignoredWords.insert(UserDictionary.normalizedKey(proposal.replacement)) }
             if !isUndo {
-                var bounded = plan.expectedText[...]
+                // Anchor undo to the host's actual text: it may have restyled our punctuation.
+                var bounded = observed[...]
                 while bounded.utf16.count > 256 { bounded.removeFirst() }
-                let clipped = plan.expectedText.utf16.count - bounded.utf16.count
+                let clipped = observed.utf16.count - bounded.utf16.count
                 let reverseRange = NSRange(location: proposal.range.location, length: proposal.replacement.utf16.count)
                 self.undoAnchor = CorrectionUndoAnchor(text: String(bounded), windowStart: proposal.snapshot.windowStart + clipped,
                     range: NSRange(location: reverseRange.location - clipped, length: reverseRange.length))
                 self.undoProposal = Proposal(snapshot: proposal.snapshot, range: reverseRange,
-                    original: proposal.replacement, replacement: proposal.original, created: Date())
+                    original: (observed as NSString).substring(with: reverseRange), replacement: proposal.original, created: Date())
             }
             self.status = isUndo ? "Correction undone" : "Ready"
             self.onChange?()

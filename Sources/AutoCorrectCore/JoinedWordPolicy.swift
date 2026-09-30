@@ -3,11 +3,17 @@ import Foundation
 /// Two-word segmentation, bounded to 32 ASCII letters. The caller must first rule
 /// out valid dictionary words, recognized names, and user overrides.
 public enum JoinedWordPolicy {
-    private static let proseStarts: Set<String> = [
-        "a", "the", "my", "your", "our", "their", "this", "that", "these", "those",
-        "you", "we", "they", "he", "she", "it", "in", "on", "at", "to", "of",
-        "for", "with", "from", "and", "but", "not", "is", "are", "was", "were",
-        "be", "can", "will", "would", "could", "should", "please", "thank", "hello"
+    /// Function words and common openers that begin joined phrases (everytime, atleast,
+    /// upto). A compound or name rarely starts with one; "home" or "insta" are not here.
+    static let proseStarts: Set<String> = [
+        "a", "an", "the", "my", "your", "our", "their", "his", "her", "its", "this", "that", "these", "those",
+        "you", "we", "they", "he", "she", "it", "in", "on", "at", "to", "of", "for", "with", "from", "by",
+        "up", "out", "off", "over", "under", "into", "onto", "about", "after", "before", "as", "so", "no",
+        "not", "all", "any", "some", "every", "each", "never", "ever", "also", "just", "only", "even",
+        "still", "too", "very", "one", "good", "how", "what", "when", "where", "who", "why", "and",
+        "but", "or", "if", "is", "are", "was", "were", "be", "been", "can", "will", "would", "could",
+        "should", "may", "might", "must", "do", "did", "does", "have", "has", "had",
+        "please", "thank", "hello", "hi", "hey", "let", "get", "go", "come", "make", "take"
     ]
     private static let firstPersonVerbs: Set<String> = [
         "know", "think", "want", "need", "like", "love", "hope", "wish", "have",
@@ -32,7 +38,8 @@ public enum JoinedWordPolicy {
         }
         // Agreement with the native automatic correction is required. Merely finding
         // two dictionary substrings would split compounds and names far too often.
-        guard let proposed = systemCorrection?.lowercased(), proposed.contains(" ") else { return nil }
+        // macOS can omit that recommendation while still ranking the split first.
+        guard let proposed = (systemCorrection ?? guesses.first)?.lowercased(), proposed.contains(" ") else { return nil }
         let parts = proposed.split(separator: " ").map(String.init)
         guard parts.count == 2, parts.joined() == source,
               proseStarts.contains(parts[0]), parts[1].count >= 2,

@@ -36,3 +36,12 @@ final class AccessibilityFallbackTests: XCTestCase {
     }
 
 }
+
+extension AccessibilityFallbackTests {
+    func testVerificationReturnsTheHostTextWhenOnlySmartPunctuationDiffers() {
+        XCTAssertEqual(AccessibilityText.confirmedText(observed: "it don’t next", expected: "it don't next"), "it don’t next")
+        XCTAssertEqual(AccessibilityText.confirmedText(observed: "it don't next", expected: "it don't next"), "it don't next")
+        XCTAssertNil(AccessibilityText.confirmedText(observed: "it dont next", expected: "it don't next"))
+        XCTAssertNil(AccessibilityText.confirmedText(observed: nil, expected: "it don't next"))
+    }
+}

@@ -75,3 +75,30 @@ extension JoinedWordsTests {
         XCTAssertNil(UnderlineGeometry.singleLine(word: .zero, first: nil, last: nil, firstLine: 0, lastLine: 0))
     }
 }
+
+extension JoinedWordsTests {
+    func testJoinedPhrasesAreNeverReplacedByADifferentSingleWord() {
+        let engine = CorrectionEngine(preferences: Preferences(defaults: UserDefaults(suiteName: UUID().uuidString)!))
+        // Native en_US recommends swell/unto/infant here. Abstaining or splitting is
+        // acceptable; substituting an unrelated word is a false correction.
+        for (word, split) in ["aswell": "as well", "upto": "up to", "infront": "in front", "abit": "a bit",
+                              "alittle": "a little", "aslong": "as long", "ontop": "on top", "sofar": "so far",
+                              "inspite": "in spite", "ontime": "on time"] {
+            let result = engine.suggestion(in: "I can do this \(word) ")
+            XCTAssertTrue(result == nil || result == split, "\(word) → \(result ?? "nil")")
+        }
+        // Real missing-letter typos that also admit an odd split keep their repair.
+        for (word, expected) in ["adress": "address", "acuracy": "accuracy", "someting": "something", "becase": "because"] {
+            XCTAssertEqual(engine.suggestion(in: "I can do this \(word) "), expected, word)
+        }
+        for (word, split) in ["everytime": "every time", "eachother": "each other", "atleast": "at least", "alot": "a lot"] {
+            XCTAssertEqual(engine.suggestion(in: "we do this \(word) "), split, word)
+        }
+        for (word, expected) in ["shes": "she's", "aint": "ain't", "wouldve": "would've", "itll": "it'll"] {
+            XCTAssertEqual(engine.suggestion(in: "I said \(word) "), expected, word)
+        }
+        for word in ["incase", "alright", "anytime", "everyday", "workout", "cannot", "into", "onto", "todo"] {
+            XCTAssertNil(engine.suggestion(in: "we do this \(word) "), word)
+        }
+    }
+}
