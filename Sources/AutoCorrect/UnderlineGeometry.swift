@@ -18,6 +18,17 @@ enum UnderlineGeometry {
         return word
     }
 
+    /// Clips a word rectangle to the visible editor area. A word cut vertically (a line
+    /// scrolled half out of view) is dropped rather than drawn at a guessed position;
+    /// a word cut horizontally keeps its visible part. No visible area means no clipping.
+    static func clipped(_ rect: CGRect, to visible: CGRect?) -> CGRect? {
+        guard valid(rect) else { return nil }
+        guard let visible else { return rect }
+        let intersection = rect.intersection(visible)
+        guard !intersection.isNull, intersection.width >= 1, intersection.height >= rect.height - 0.5 else { return nil }
+        return intersection
+    }
+
     private static func valid(_ rect: CGRect) -> Bool {
         rect.origin.x.isFinite && rect.origin.y.isFinite && rect.width.isFinite && rect.height.isFinite &&
             rect.width >= 1 && rect.width <= 1_200 && rect.height >= 4 && rect.height <= 100

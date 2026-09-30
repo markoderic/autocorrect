@@ -62,6 +62,7 @@ final class KeyboardMonitor {
                 monitor.onKey?(text, event.flags, event.getIntegerValueField(.keyboardEventKeycode))
             } else if type != .flagsChanged {
                 monitor.cancelEdit()
+                RuntimeDiagnostics.record(type == .scrollWheel ? "scroll event" : "mouse event")
                 monitor.onMouse?()
             }
             return Unmanaged.passUnretained(event)

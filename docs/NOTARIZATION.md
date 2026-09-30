@@ -16,7 +16,7 @@ On September 29, 2026, the development Mac had only an Apple Development signing
 
 ```sh
 swift test --build-system native
-VERSION=0.3.8 \
+VERSION=0.3.9 \
 SIGNING_IDENTITY='Developer ID Application: YOUR NAME (TEAMID)' \
 NOTARY_PROFILE='your-existing-keychain-profile' \
 ./scripts/release.sh
@@ -29,7 +29,7 @@ Only then update the Homebrew cask with the final ZIP checksum, upload that exac
 ## Explicit preview builds
 
 ```sh
-RELEASE_CHANNEL=preview VERSION=0.3.8 ./scripts/release.sh
+RELEASE_CHANNEL=preview VERSION=0.3.9 ./scripts/release.sh
 ```
 
 This deliberately creates an **unnotarized preview**, which must be labeled as such. Ordinary CI runs tests and `build.sh`; they are not notarized releases. No script publishes automatically.

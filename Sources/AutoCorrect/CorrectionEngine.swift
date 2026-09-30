@@ -26,8 +26,22 @@ final class CorrectionEngine {
     private var attemptedBoundaries: [UInt64: Int] = [:]
     private var manualRewrites = ManualRewriteProtection()
     private var rewriteField: (pid: pid_t, element: AXUIElement, id: UUID)?
+    // Persistent spelling marks for the focused field: the model, the occurrences the user
+    // deliberately kept, the field they belong to, and the debounced scan/render work.
+    private var markSet = SpellingMarkSet()
+    private var overridden = SpellingMarkSet()
+    private var markField: (pid: pid_t, element: AXUIElement)?
+    private var fieldObserver: FieldObserver?
+    private var scanWork: DispatchWorkItem?
+    private var renderWork: DispatchWorkItem?
+    private(set) var underlineStatus = "Underlines: none"
+    var marks: [SpellingMark] { markSet.marks }
+    /// Tests inspect the model without a real field; nothing is drawn.
+    var suppressesRendering = false
     #if DEBUG
     var nativeAssessmentObserver: ((String, Bool, String?, [String]) -> Void)?
+    /// Test hook: feeds keystrokes to the boundary queue without the event tap.
+    func debugAppendKeys(_ text: String) { for character in text { backlog.append(String(character)) } }
     #endif
     private struct Assessment {
         let misspelled: Bool
@@ -45,6 +59,10 @@ final class CorrectionEngine {
         monitor.onMouse = { [weak self] in
             self?.manualRewrites.noteManualEdit(now: ProcessInfo.processInfo.systemUptime)
             self?.resetTyping(); self?.indicator.hide()
+            // Clicks and scrolling move text under the marks; redraw once the view settles,
+            // and scan the region that may have scrolled into view.
+            self?.scheduleRender(delay: 250)
+            self?.scheduleScan(delay: 450)
         }
         monitor.onUndo = { [weak self] in
             guard let self, self.undoProposal != nil, !self.inFlight else { return false }
@@ -62,11 +80,13 @@ final class CorrectionEngine {
         prepareFocusedApplication()
         status = monitor.start() ? "Ready" : "Keyboard access unavailable — restart AutoCorrect"
         onChange?()
+        scheduleScan(delay: 200)
     }
 
     func focusChanged() {
         invalidate()
         prepareFocusedApplication()
+        scheduleScan(delay: 400)
     }
 
     private func prepareFocusedApplication() {
@@ -91,6 +111,13 @@ final class CorrectionEngine {
         backlog.reset()
         attemptedBoundaries.removeAll()
         flaggedWord = nil
+        scanWork?.cancel()
+        renderWork?.cancel()
+        markSet.removeAll()
+        overridden.removeAll()
+        markField = nil
+        fieldObserver = nil
+        underlineStatus = "Underlines: none"
         indicator.hide()
         if monitor.isRunning { status = "Ready" }
     }
@@ -112,11 +139,13 @@ final class CorrectionEngine {
         let hadProposal = pending != nil || flaggedWord != nil
         pending = nil
         flaggedWord = nil
+        // Text moves while typing; marks stay in the model and are redrawn after a pause.
         indicator.hide()
         if hadProposal { status = "Ready"; onChange?() }
+        if keyCode == 9, flags.contains(.maskCommand) { scheduleScan(delay: 600) }   // paste
         guard preferences.enabled, !flags.contains(.maskCommand), !flags.contains(.maskControl), !flags.contains(.maskAlternate),
               ![36, 48, 51, 53, 76, 115, 116, 117, 119, 121, 123, 124, 125, 126].contains(keyCode),
-              let text, TypingTypography.isSupportedKeystroke(text) else { resetTyping(); return }
+              let text, TypingTypography.isSupportedKeystroke(text) else { resetTyping(); scheduleRender(delay: 300); return }
         backlog.append(text)
         readAttempts = 0
         attemptedBoundaries = attemptedBoundaries.filter { entry in backlog.boundaries.contains { $0.id == entry.key } }
@@ -150,6 +179,17 @@ final class CorrectionEngine {
             return
         }
         if status.hasPrefix("Text access unavailable") { status = "Ready"; onChange?() }
+        processBoundaries(using: snapshot)
+    }
+
+    /// Assesses every queued boundary against one snapshot. Separated from the
+    /// Accessibility read so tests can drive it. Detection adds marks; only confident
+    /// automatic repairs post edits; rendering happens after the pass.
+    func processBoundaries(using snapshot: AccessibilityText.Snapshot) {
+        adoptField(snapshot.element, pid: snapshot.pid)
+        markSet.reconcile(text: snapshot.text, windowStart: snapshot.windowStart)
+        overridden.reconcile(text: snapshot.text, windowStart: snapshot.windowStart)
+        defer { scheduleRender(delay: 120); scheduleScan(delay: 500) }
         while let boundary = backlog.boundaries.first {
             guard let completed = boundary.completedPrefix(in: snapshot.text) else {
                 if retryRead() { return }
@@ -158,26 +198,30 @@ final class CorrectionEngine {
             }
             if !boundary.spellingCorrected, let candidate = candidate(in: completed),
                snapshot.windowStart == 0 || candidate.range.location > 0,
-               !preferences.ignoredWords.contains(UserDictionary.normalizedKey(candidate.original)),
-               !isManualRewrite(candidate, snapshot: snapshot) {
-                let result = assessment(candidate.original, context: completed, range: candidate.range)
-                if result.misspelled {
-                    flaggedWord = candidate.original
-                    if let replacement = result.replacement {
-                        let proposal = Proposal(snapshot: snapshot, range: candidate.range, original: candidate.original,
-                                                replacement: replacement, created: Date())
-                        if preferences.asksBeforeCorrecting || !result.automatic {
-                            showSuggestion(proposal)
+               !preferences.ignoredWords.contains(UserDictionary.normalizedKey(candidate.original)) {
+                if isManualRewrite(candidate, snapshot: snapshot) {
+                    // The user deliberately restored this spelling here: no correction, no mark.
+                    noteOverride(SpellingMark(location: snapshot.windowStart + candidate.range.location, word: candidate.original))
+                } else {
+                    let result = assessment(candidate.original, context: completed, range: candidate.range)
+                    if result.misspelled {
+                        flaggedWord = candidate.original
+                        if let replacement = result.replacement {
+                            let proposal = Proposal(snapshot: snapshot, range: candidate.range, original: candidate.original,
+                                                    replacement: replacement, created: Date())
+                            if preferences.asksBeforeCorrecting || !result.automatic {
+                                showSuggestion(proposal)
+                            } else {
+                                // Keep this boundary until both spelling and context have been
+                                // assessed against a fresh post-edit snapshot.
+                                perform(proposal, isUndo: false, andIgnore: false, boundaryID: boundary.id)
+                                return
+                            }
                         } else {
-                            // Keep this boundary until both spelling and context have been
-                            // assessed against a fresh post-edit snapshot.
-                            perform(proposal, isUndo: false, andIgnore: false, boundaryID: boundary.id)
-                            return
+                            status = "Possible misspelling: \(candidate.original)"
+                            addMark(SpellingMark(location: snapshot.windowStart + candidate.range.location, word: candidate.original), near: snapshot.caret)
+                            onChange?()
                         }
-                    } else {
-                        status = "Possible misspelling: \(candidate.original)"
-                        if preferences.showsSpellingIndicators { indicator.show(snapshot: snapshot, range: candidate.range) }
-                        onChange?()
                     }
                 }
             }
@@ -192,7 +236,7 @@ final class CorrectionEngine {
                     perform(proposal, isUndo: false, andIgnore: false, boundaryID: boundary.id, contextual: true)
                     return
                 }
-                showSuggestion(proposal)
+                showSuggestion(proposal, spelling: false)
             }
             backlog.remove(boundary.id)
         }
@@ -227,14 +271,148 @@ final class CorrectionEngine {
         return candidate
     }
 
-    func showSuggestion(_ proposal: Proposal) {
+    /// `spelling` distinguishes an unresolved misspelling (marked) from a contextual
+    /// grammar doubt such as its/it's (indicated in the menu only, never underlined).
+    func showSuggestion(_ proposal: Proposal, spelling: Bool = true) {
         // Automatic mode must never silently turn into review mode for a weak guess.
         // Keep its visual indication, but only create an approval action when requested.
         pending = preferences.asksBeforeCorrecting ? proposal : nil
         flaggedWord = proposal.original
         status = preferences.asksBeforeCorrecting ? "Suggestion ready" : "Possible misspelling: \(proposal.original)"
-        if preferences.showsSpellingIndicators { indicator.show(snapshot: proposal.snapshot, range: proposal.range) }
+        if spelling {
+            addMark(SpellingMark(location: proposal.snapshot.windowStart + proposal.range.location, word: proposal.original),
+                    near: proposal.snapshot.caret)
+        }
         onChange?()
+    }
+
+    // MARK: - Persistent spelling marks
+
+    private func adoptField(_ element: AXUIElement, pid: pid_t) {
+        if let field = markField, field.pid == pid, CFEqual(field.element, element) { return }
+        markSet.removeAll()
+        overridden.removeAll()
+        markField = (pid, element)
+        fieldObserver = nil
+        guard pid != ProcessInfo.processInfo.processIdentifier, AXIsProcessTrusted(),
+              let observer = FieldObserver(pid: pid, element: element) else { return }
+        observer.onEvent = { [weak self] event in self?.handleFieldEvent(event) }
+        fieldObserver = observer
+    }
+
+    private func handleFieldEvent(_ event: FieldObserver.Event) {
+        switch event {
+        case .valueChanged: scheduleScan(delay: 500)
+        case .selectionChanged: scheduleRender(delay: 150)
+        case .windowMoved, .windowResized: indicator.hide(); scheduleRender(delay: 120)
+        case .focusChanged: invalidate(); scheduleScan(delay: 300)
+        case .deactivated, .destroyed: invalidate()
+        }
+    }
+
+    private func addMark(_ mark: SpellingMark, near caret: Int) {
+        guard preferences.showsSpellingIndicators, !overridden.marks.contains(mark) else { return }
+        markSet.insert(mark, near: caret)
+    }
+
+    /// A deliberate user override (undo, retyping a correction) keeps that occurrence unmarked.
+    func noteOverride(_ mark: SpellingMark) {
+        markSet.remove(at: mark.location)
+        overridden.insert(mark, near: mark.location)
+        scheduleRender(delay: 50)
+    }
+
+    /// A posted edit changed `length` units at `location` into `replacementLength` units.
+    func noteAppliedEdit(location: Int, length: Int, replacementLength: Int) {
+        markSet.applyEdit(at: location, length: length, replacementLength: replacementLength)
+        overridden.applyEdit(at: location, length: length, replacementLength: replacementLength)
+        scheduleRender(delay: 50)
+    }
+
+    func ignore(word: String) {
+        preferences.ignoredWords.insert(UserDictionary.normalizedKey(word))
+        markSet.remove(word: word)
+        scheduleRender(delay: 50)
+    }
+
+    /// Marks for existing text: one native query for the whole bounded region, then the
+    /// tokenization and policy filters. Never posts edits.
+    func scanMarks(text: String, windowStart: Int, caret: Int) -> [SpellingMark] {
+        guard preferences.showsSpellingIndicators, (1...2048).contains(text.utf16.count) else { return [] }
+        let checker = NSSpellChecker.shared
+        let spellDocument = NSSpellChecker.uniqueSpellDocumentTag()
+        defer { checker.closeSpellDocument(withTag: spellDocument) }
+        let orthography = NSOrthography(dominantScript: "Latn", languageMap: ["Latn": [preferences.language]])
+        let results = checker.check(text, range: NSRange(location: 0, length: text.utf16.count),
+                                    types: NSTextCheckingResult.CheckingType.spelling.rawValue,
+                                    options: [.orthography: orthography],
+                                    inSpellDocumentWithTag: spellDocument, orthography: nil, wordCount: nil)
+        let ranges = results.filter { $0.resultType == .spelling }.map(\.range)
+        let localCaret = (caret - windowStart) >= 0 && (caret - windowStart) <= text.utf16.count ? caret - windowStart : nil
+        let ignored = preferences.ignoredWords
+        let custom = preferences.customCorrections
+        return SpellingScan.marks(in: text, windowStart: windowStart, misspelledRanges: ranges, activeCaret: localCaret) { word in
+            let key = UserDictionary.normalizedKey(word)
+            return !ignored.contains(key) && custom[key] == nil && !NameLexicon.recognizes(word)
+                && BuiltInReplacements.casing[key] == nil && BuiltInReplacements.expansions[key] == nil
+        }.filter { !overridden.marks.contains($0) }
+    }
+
+    private func scheduleScan(delay: Int) {
+        scanWork?.cancel()
+        guard preferences.enabled, preferences.showsSpellingIndicators, !suppressesRendering else { return }
+        let task = DispatchWorkItem { [weak self] in self?.performScan() }
+        scanWork = task
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(delay), execute: task)
+    }
+
+    private func performScan() {
+        guard preferences.enabled, preferences.showsSpellingIndicators, AXIsProcessTrusted(), !inFlight,
+              let app = NSWorkspace.shared.frontmostApplication,
+              app.processIdentifier != ProcessInfo.processInfo.processIdentifier,
+              let bundleID = app.bundleIdentifier, !preferences.excludedApps.contains(bundleID) else { return }
+        guard let region = AccessibilityText.focusedTextRegion(pid: app.processIdentifier) else {
+            underlineStatus = "Underlines: text unavailable in \(app.localizedName ?? "this app")"
+            indicator.hide()
+            onChange?()
+            return
+        }
+        adoptField(region.element, pid: region.pid)
+        let fresh = scanMarks(text: region.text, windowStart: region.windowStart, caret: region.caret)
+        markSet.replace(in: NSRange(location: region.windowStart, length: region.text.utf16.count), with: fresh, near: region.caret)
+        if let length = region.length {
+            markSet.truncate(to: length)
+            overridden.truncate(to: length)
+        }
+        RuntimeDiagnostics.record("scan: \(fresh.count) mark(s) in region")
+        renderMarks()
+    }
+
+    private func scheduleRender(delay: Int) {
+        renderWork?.cancel()
+        guard !suppressesRendering else { return }
+        let task = DispatchWorkItem { [weak self] in self?.renderMarks() }
+        renderWork = task
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(delay), execute: task)
+    }
+
+    private func renderMarks() {
+        guard !suppressesRendering else { return }
+        guard preferences.enabled, preferences.showsSpellingIndicators, let field = markField,
+              NSWorkspace.shared.frontmostApplication?.processIdentifier == field.pid else { indicator.hide(); return }
+        guard !markSet.marks.isEmpty else {
+            indicator.hide()
+            if underlineStatus != "Underlines: none" { underlineStatus = "Underlines: none"; onChange?() }
+            return
+        }
+        let summary = indicator.render(marks: markSet.marks, element: field.element)
+        var parts = ["\(summary.placed) shown"]
+        if summary.failed > 0 { parts.append("\(summary.failed) without geometry") }
+        if summary.hidden > 0 { parts.append("\(summary.hidden) out of view") }
+        let text = summary.placed == 0 && summary.failed > 0
+            ? "Underlines: \(markSet.marks.count) found, geometry unavailable in this field"
+            : "Underlines: " + parts.joined(separator: ", ")
+        if text != underlineStatus { underlineStatus = text; onChange?() }
     }
 
     private func candidate(in text: String) -> CorrectionCandidate? {
@@ -476,7 +654,17 @@ final class CorrectionEngine {
             self.inFlight = false
             RuntimeDiagnostics.record("correction verified")
             self.correctionCount = max(0, self.correctionCount + (isUndo ? -1 : 1))
-            if andIgnore { self.preferences.ignoredWords.insert(UserDictionary.normalizedKey(proposal.replacement)) }
+            let editLocation = proposal.snapshot.windowStart + proposal.range.location
+            self.noteAppliedEdit(location: editLocation, length: proposal.original.utf16.count,
+                                 replacementLength: proposal.replacement.utf16.count)
+            if isUndo {
+                // The user asked for the original spelling back: keep that occurrence unmarked.
+                self.noteOverride(SpellingMark(location: editLocation, word: proposal.replacement))
+            }
+            if andIgnore {
+                self.preferences.ignoredWords.insert(UserDictionary.normalizedKey(proposal.replacement))
+                self.markSet.remove(word: proposal.replacement)
+            }
             if !isUndo {
                 // Anchor undo to the host's actual text: it may have restyled our punctuation.
                 var bounded = observed[...]
@@ -512,10 +700,9 @@ final class CorrectionEngine {
 
     func ignorePendingWord() {
         guard let word = pending?.original ?? flaggedWord else { return }
-        preferences.ignoredWords.insert(UserDictionary.normalizedKey(word))
+        ignore(word: word)
         self.pending = nil
         flaggedWord = nil
-        indicator.hide()
         status = "Word ignored"
         onChange?()
     }

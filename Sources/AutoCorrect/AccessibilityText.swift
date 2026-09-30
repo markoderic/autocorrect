@@ -139,6 +139,56 @@ enum AccessibilityText {
         return Snapshot(element: element, pid: pid, text: text, windowStart: start, caret: selected.location, physicalKeyCount: keyCount)
     }
 
+    struct Region {
+        let element: AXUIElement
+        let pid: pid_t
+        let text: String
+        let windowStart: Int
+        let caret: Int
+        /// The field's total length when the editor reports it.
+        let length: Int?
+    }
+
+    /// A bounded read around the caret for scanning existing text: the editor's visible
+    /// character range when it reports one (at most 2,048 units), otherwise up to 768 units
+    /// before and 256 after the caret. Same role, secure-field and caret requirements as
+    /// `snapshot`; reads happen in bounded chunks and never fetch a whole document.
+    static func focusedTextRegion(pid: pid_t) -> Region? {
+        guard let element = focusedElement(pid: pid) else { return nil }
+        guard let role = attribute(element, kAXRoleAttribute) as? String,
+              [kAXTextFieldRole, kAXTextAreaRole, kAXComboBoxRole].contains(role),
+              (attribute(element, kAXSubroleAttribute) as? String) != kAXSecureTextFieldSubrole else { return nil }
+        guard let selected = range(element), selected.length == 0, selected.location >= 0 else { return nil }
+        let caret = selected.location
+        let count = (attribute(element, kAXNumberOfCharactersAttribute) as? NSNumber)?.intValue
+        var start = max(0, caret - 768)
+        var end = caret + 256
+        if let value = attribute(element, kAXVisibleCharacterRangeAttribute), CFGetTypeID(value) == AXValueGetTypeID() {
+            var visible = CFRange()
+            if AXValueGetValue(value as! AXValue, .cfRange, &visible), visible.location >= 0, (1...2048).contains(visible.length),
+               visible.location <= caret, caret <= visible.location + visible.length {
+                start = visible.location
+                end = visible.location + visible.length
+            }
+        }
+        if let count { end = min(end, count) }
+        guard end > start, end - start <= 2048 else { return nil }
+        var text = ""
+        var cursor = start
+        while cursor < end {
+            let length = min(512, end - cursor)
+            guard let chunk = substring(element, range: CFRange(location: cursor, length: length)) else {
+                // A count-less editor may reject the part after the caret; keep what was read.
+                if cursor >= caret, !text.isEmpty { break }
+                return nil
+            }
+            text += chunk
+            cursor += length
+        }
+        guard !text.isEmpty else { return nil }
+        return Region(element: element, pid: pid, text: text, windowStart: start, caret: caret, length: count)
+    }
+
     // The SDK specifies that this counts hardware key-down events, but not autorepeat.
     private static var physicalKeyCount: UInt32 {
         CGEventSource.counterForEventType(.hidSystemState, eventType: .keyDown)

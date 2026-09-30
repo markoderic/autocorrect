@@ -4,9 +4,9 @@ Autocorrect that keeps up with your typing. A small Mac menu bar app that fixes 
 
 ## Download and install
 
-<a href="https://github.com/markoderic/autocorrect/releases/download/v0.3.8/AutoCorrect-0.3.8-universal.zip"><img src="docs/media/download-macos.svg" alt="Download AutoCorrect for macOS" width="296" height="56"></a>
+<a href="https://github.com/markoderic/autocorrect/releases/download/v0.3.9/AutoCorrect-0.3.9-universal.zip"><img src="docs/media/download-macos.svg" alt="Download AutoCorrect for macOS" width="296" height="56"></a>
 
-[Download ZIP](https://github.com/markoderic/autocorrect/releases/download/v0.3.8/AutoCorrect-0.3.8-universal.zip) · **macOS 13 or later** · Apple silicon and Intel · [v0.3.8 preview](https://github.com/markoderic/autocorrect/releases/tag/v0.3.8)
+[Download ZIP](https://github.com/markoderic/autocorrect/releases/download/v0.3.9/AutoCorrect-0.3.9-universal.zip) · **macOS 13 or later** · Apple silicon and Intel · [v0.3.9 preview](https://github.com/markoderic/autocorrect/releases/tag/v0.3.9)
 
 **Preview installation notice:** Apple has not notarized this download yet. If you see **“Apple cannot check it for malicious software,”** that is the known first-launch limitation described below. Homebrew installs the same unnotarized build. [Signing status and release process](docs/NOTARIZATION.md).
 
@@ -48,6 +48,12 @@ Then open **AutoCorrect** from **Applications** and follow steps 3–4 above. Th
 
 **This is an early release.** App compatibility varies; it cannot correct text in every app or field. See [validation and known limits](docs/VALIDATION.md).
 
+## What changed in 0.3.9
+
+- **Persistent spelling underlines.** Unresolved misspellings stay marked while you keep typing; several words can be marked at once; a mark disappears only when its word is corrected, deleted, ignored or deliberately retyped. Existing text around the caret is checked when a field gains focus, after pasting, scrolling or edits, within documented bounds, and is never rewritten automatically. Contextual grammar doubts (`its`/`it's`) are indicated in the menu but not underlined. Marks follow window moves and resizes, hide while a view scrolls and return afterwards, disappear when you switch apps, and clear predictably when the toggle is turned off. The menu reports how many marks are shown and how many could not be drawn because the editor exposes no trustworthy geometry.
+- **Automatic correction unchanged** from the unpublished 0.3.8 work, which is included here: fewer wrong replacements through letter-preserving repairs, joined phrases never replaced by unrelated words, more contractions, verified corrections in rich editors, and the held-out evaluation harness. See the 0.3.8 notes in [docs/releases](docs/releases/).
+- **Still unnotarized.** The first-launch caveat above is unchanged.
+
 ## What changed in 0.3.8
 
 - **Fewer wrong replacements:** when macOS recommends a different word but its own ranked guesses contain a repair that keeps every letter you typed, that repair wins (`higer → higher`, not `tiger`; `caost → coast`; `considerd → considered`). When several such repairs compete, the word is left alone. On a pinned public misspelling corpus this reduced wrong automatic replacements from 118 to 77 in the held-out half and from 131 to 106 in the development half on one Mac, with a small rise in untouched words. See [evaluation](evaluation/README.md).
@@ -78,7 +84,7 @@ Then open **AutoCorrect** from **Applications** and follow steps 3–4 above. Th
 - **Settings → Text Replacements:** choose a typed shortcut and its replacement phrase (up to 120 characters), including exact capitalization. Add the same typed word again to update it. Ignored words take precedence over custom corrections.
 - **Settings → Writing → Capitalize after . ? !:** enabled by default. Capitalizes the next completed word when you type its space or punctuation (`Done. hello ` → `Done. Hello `, `Really? hello ` → `Really? Hello `). Turn it off independently of spelling correction. Common abbreviations, initials, decimals, URLs, and ambiguous period endings are skipped. Ignored words and exact custom replacements keep priority.
 - **Fix missing spaces:** automatically separate clear two-word combinations; turn this off to stop automatic splitting.
-- **Show Spelling Underlines:** optionally draw a red wavy underline beneath the latest completed possible misspelling. This requires the host app to expose the word's on-screen bounds. It clears on typing, clicking, scrolling, app switching, or after five seconds. It does not continuously mark the whole document. AutoCorrect does not change other apps’ native spelling-underline settings; macOS has no verified universal live switch for those controls.
+- **Show Spelling Underlines:** draws red wavy marks beneath unresolved possible misspellings in the focused field and keeps them there until the word is corrected, deleted, ignored, or deliberately retyped. Marks persist while you type other words; the overlay hides for a moment during keystrokes, scrolling and window moves and is redrawn once the view settles. Existing text is checked in a bounded region around the caret (the editor's visible range when it reports one, at most about 2,000 characters) when a field gains focus, after pasting, scrolling or other edits; existing text is never rewritten automatically. At most 32 marks are kept per field; names, capitalized words, acronyms, code, paths and addresses are never marked; the word being typed is left alone until it is completed. Marks need the host app to expose on-screen bounds for text ranges: when it does not, the menu says how many possible misspellings were found without drawable geometry instead of guessing positions. The overlay never takes focus, intercepts typing or selects text. AutoCorrect does not change other apps’ native spelling-underline settings.
 - English (US) is the default; the language selector is in Settings. Uncertain dictionary suggestions are underlined without approval prompts in automatic mode. Turn on Ask Before Correcting to review suggestions.
 - Automatically requests launch at login on first launch; you can turn it off in the menu bar.
 - Uses read-only macOS Accessibility to check the field, then native keyboard input to correct it without temporarily selecting the word.
@@ -111,8 +117,8 @@ The build script compiles **arm64 and x86_64**, combines them into a universal e
 
 ```text
 dist/AutoCorrect.app
-dist/AutoCorrect-0.3.8-universal.zip
-dist/AutoCorrect-0.3.8-universal.zip.sha256
+dist/AutoCorrect-0.3.9-universal.zip
+dist/AutoCorrect-0.3.9-universal.zip.sha256
 ```
 
 It can be called from any working directory. The installer uses `/Applications` when writable, otherwise `~/Applications`. Use `--user` to choose `~/Applications`, `--no-open` to install without launching, and `--replace` to replace an existing installation. Quit AutoCorrect before replacing it; the installer preserves the previous bundle alongside the new one.
