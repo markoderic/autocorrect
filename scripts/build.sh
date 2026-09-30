@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
-VERSION="${VERSION:-0.3.7}"
+VERSION="${VERSION:-0.3.8}"
 SIGNING_IDENTITY="${SIGNING_IDENTITY:--}"
 APP="$ROOT/dist/AutoCorrect.app"
 

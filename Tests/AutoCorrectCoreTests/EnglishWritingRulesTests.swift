@@ -84,3 +84,25 @@ extension EnglishWritingRulesTests {
             systemCorrection: nil, guesses: ["would", "wouldn't"]))
     }
 }
+
+extension EnglishWritingRulesTests {
+    func testDamagedContractionRepairNeedsTheNativeRecommendationUnlessLettersArePreserved() {
+        // Evaluation false corrections: heros → here's, whants → what's, wheras → where's.
+        // A lower-ranked guess is not agreement; only the automatic recommendation (or the
+        // top guess when that recommendation is absent) may license a non-transposition.
+        XCTAssertNil(EnglishWritingRules.typoReplacement(for: "heros", language: "en_US",
+            systemCorrection: "heres", guesses: ["here's", "heres", "hers", "hero", "heroes"]))
+        XCTAssertNil(EnglishWritingRules.typoReplacement(for: "whants", language: "en_US",
+            systemCorrection: "whats", guesses: ["what's", "whats", "wants"]))
+        XCTAssertNil(EnglishWritingRules.typoReplacement(for: "wheras", language: "en_US",
+            systemCorrection: "wheres", guesses: ["wheres", "where's", "whereas"]))
+        XCTAssertEqual(EnglishWritingRules.typoReplacement(for: "doesn", language: "en_US",
+            systemCorrection: "doesn't", guesses: ["doesn't"]), "doesn't")
+        XCTAssertEqual(EnglishWritingRules.typoReplacement(for: "doesn", language: "en_US",
+            systemCorrection: nil, guesses: ["doesn't", "does"]), "doesn't")
+        XCTAssertNil(EnglishWritingRules.typoReplacement(for: "doesn", language: "en_US",
+            systemCorrection: nil, guesses: ["does", "doesn't"]))
+        XCTAssertEqual(EnglishWritingRules.typoReplacement(for: "doenst", language: "en_US",
+            systemCorrection: nil, guesses: []), "doesn't")
+    }
+}

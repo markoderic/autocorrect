@@ -376,6 +376,14 @@ final class CorrectionEngine {
                 confident = nil
                 phrase = prose
             }
+            // A native consonant substitution or deletion yields to a ranked repair that keeps
+            // every typed letter (higer → higher, not tiger). Several such repairs abstain.
+            if let repair = confident {
+                let alternatives = CorrectionPolicy.letterPreservingAlternatives(for: word, accepted: repair, guesses: guesses)
+                    .filter { checker.checkSpelling(of: $0, startingAt: 0, language: preferences.language,
+                                                    wrap: false, inSpellDocumentWithTag: spellDocument, wordCount: nil).location == NSNotFound }
+                if alternatives.count == 1 { confident = alternatives[0] } else if alternatives.count > 1 { confident = nil }
+            }
             // Dictionary guesses can cover larger mistakes, but never apply them without approval.
             let review = preserveCompound ? guesses.first : (confident ?? phrase ?? proposed ?? guesses.first)
             answer = Assessment(misspelled: true, replacement: review, automatic: confident != nil)

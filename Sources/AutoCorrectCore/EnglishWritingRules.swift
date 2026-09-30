@@ -38,13 +38,15 @@ public enum EnglishWritingRules {
         }
         guard candidates.count == 1, let (key, replacement) = candidates.first,
               source.prefix(2) == key.prefix(2) else { return nil }
-        let native = ([systemCorrection].compactMap { $0 } + Array(guesses.prefix(3))).map {
-            $0.lowercased().replacingOccurrences(of: "’", with: "'")
-        }
-        // Native agreement also permits a missing/extra letter. Without it, only a
-        // unique adjacent transposition preserving every letter is eligible.
+        // Native agreement also permits a missing/extra letter or substitution. Only the
+        // automatic recommendation counts (or the top guess when it is absent): a lower
+        // ranked guess licensed heros → here's and whants → what's. Without agreement,
+        // only a unique adjacent transposition preserving every letter is eligible.
+        func normalized(_ word: String) -> String { word.lowercased().replacingOccurrences(of: "’", with: "'") }
+        let nativeAgrees = systemCorrection.map(normalized) == replacement.lowercased() ||
+            (systemCorrection == nil && guesses.first.map(normalized) == replacement.lowercased())
         let preservesLetters = source.count == key.count && source.sorted() == key.sorted()
-        guard native.contains(replacement.lowercased()) || preservesLetters else { return nil }
+        guard nativeAgrees || preservesLetters else { return nil }
         return original.first?.isUppercase == true
             ? replacement.prefix(1).uppercased() + replacement.dropFirst() : replacement
     }

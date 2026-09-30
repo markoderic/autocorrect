@@ -4,3 +4,4 @@
 dist/
 *.xcuserstate
 xcuserdata/
+evaluation/observations.json

@@ -181,6 +181,86 @@ public enum CorrectionPolicy {
         return rankedGuessReplacement(for: original, systemCorrection: systemCorrection, guesses: guesses)
     }
 
+    /// Evidence-based edit-type preference (see evaluation/). Native en_US often
+    /// recommends a same-length consonant substitution or a deletion while its own top
+    /// guesses contain a repair that keeps every typed letter: higer → higher, not tiger;
+    /// considerd → considered, not consider; caost → coast, not cast. That repair is the
+    /// better explanation of the typo. The accepted repair keeps precedence when it
+    /// preserves letters itself, substitutes a vowel (faught → fought; y counts as a
+    /// vowel), or deletes one of a doubled pair (carefull → careful). An insertion before
+    /// the first letter never wins (eminate → geminate). Returns every qualifying
+    /// alternative; the caller verifies each against the dictionary and applies only a
+    /// unique survivor, abstaining when several remain (agre → agree or ager).
+    public static func letterPreservingAlternatives(for original: String, accepted: String, guesses: [String]) -> [String] {
+        guard isLetters(original), hasSafeCase(original), isLetters(accepted), hasSafeCase(accepted),
+              original.first?.isUppercase == true || accepted.first?.isUppercase != true,
+              let acceptedEdit = singleEdit(from: original, to: accepted) else { return [] }
+        let source = Array(UserDictionary.normalizedKey(original))
+        switch acceptedEdit {
+        case .insertion, .transposition:
+            return []
+        case .substitution(let index):
+            let vowels = "aeiouy"
+            if vowels.contains(source[index]), vowels.contains(Array(UserDictionary.normalizedKey(accepted))[index]) { return [] }
+        case .deletion(let index):
+            if (index > 0 && source[index - 1] == source[index]) ||
+                (index + 1 < source.count && source[index + 1] == source[index]) { return [] }
+        }
+        let acceptedKey = UserDictionary.normalizedKey(accepted)
+        var alternatives: [String] = []
+        for guess in guesses.prefix(5) {
+            let key = UserDictionary.normalizedKey(guess)
+            guard key != acceptedKey, !alternatives.contains(where: { UserDictionary.normalizedKey($0) == key }),
+                  isLetters(guess), hasSafeCase(guess),
+                  original.first?.isUppercase == true || guess.first?.isUppercase != true,
+                  let edit = singleEdit(from: original, to: guess) else { continue }
+            switch edit {
+            case .transposition: alternatives.append(guess)
+            case .insertion(let index) where index > 0: alternatives.append(guess)
+            default: continue
+            }
+        }
+        return alternatives
+    }
+
+    private enum SingleEdit {
+        case insertion(Int), deletion(Int), substitution(Int), transposition
+    }
+
+    /// Classifies exactly one edit between normalized forms; `nil` for zero or more edits.
+    private static func singleEdit(from source: String, to target: String) -> SingleEdit? {
+        let left = Array(UserDictionary.normalizedKey(source))
+        let right = Array(UserDictionary.normalizedKey(target))
+        if left.count == right.count {
+            let differences = left.indices.filter { left[$0] != right[$0] }
+            if differences.count == 1 { return .substitution(differences[0]) }
+            if differences.count == 2, differences[1] == differences[0] + 1,
+               left[differences[0]] == right[differences[1]], left[differences[1]] == right[differences[0]] {
+                return .transposition
+            }
+            return nil
+        }
+        if right.count == left.count + 1 {
+            var index = 0
+            while index < left.count, left[index] == right[index] { index += 1 }
+            var shortened = right
+            shortened.remove(at: index)
+            return shortened == left ? .insertion(index) : nil
+        }
+        if left.count == right.count + 1 {
+            var index = 0
+            while index < right.count, left[index] == right[index] { index += 1 }
+            var shortened = left
+            shortened.remove(at: index)
+            return shortened == right ? .deletion(index) : nil
+        }
+        return nil
+    }
+
+    private static func isLetters(_ word: String) -> Bool {
+        (2...32).contains(word.count) && word.allSatisfy(\.isLetter)
+    }
+
     /// A missing doubled consonant should not become an unrelated substitution:
     /// kiding -> kidding preserves every letter; riding/hiding change the first one.
     /// Only dictionary-ranked candidates participate, and competing repairs block it.
