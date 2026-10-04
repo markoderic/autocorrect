@@ -6,7 +6,7 @@ This update supersedes the local-only installation status in the historical sect
 - Startup verified through process path, `--diagnostics` and native settings UI: Ready, enabled, both permissions allowed, keyboard listener/layout available, launch at login enabled. Settings were not reset.
 - Local runtime suite: **233 executed, 232 passed, one gated evaluation skipped, zero failures**. Universal release build passed after the version bump. Physical-keyboard/editor testing of the new batch remains open; prior injected TextEdit input was inconclusive.
 - ZIP SHA-256: `17caf17f64a0ffb3e77092684473fadae5dbbf382b4dd602816db0e46cabdd89`. Installed executable SHA-256: `0fcbed4e42df839c59e500c44ef351f71ea0afe43554cc6c59574443ca720e2e`.
-- Public preview remains **v0.3.7**; README and Homebrew reference its verified existing asset. No .10 release published; local build remains unnotarized. Hosted CI is pending the accompanying source push; see the work log for final results.
+- Public preview remains **v0.3.7**; README and Homebrew reference its verified existing asset. No .10 release published; local build remains unnotarized. Hosted macOS 14 [CI passed](https://github.com/markoderic/autocorrect/actions/runs/37172260553) for `dd40a19`: 233 tests executed, 232 passed, one skipped, zero failures; universal build and artifact upload passed. The first run exposed an OS-dependent `abit` test assumption; only that integration expectation changed, preserving exact checks for other fixtures and policies. Production code remains the installed `91ea2e2`.
 
 ---
 

@@ -4,14 +4,14 @@ This is the durable handoff between Claude, Codex and the owner. Read [CLAUDE-HA
 
 ## Current resume state
 
-- **As of:** October 3, 2026 (America/New_York), installation complete; source push/CI in progress.
+- **As of:** October 3, 2026 (America/New_York), installation and GitHub source push complete; hosted CI passed.
 - **Latest task:** Owner authorized installing the repaired batch and pushing GitHub. Installed 0.3.10 includes Claude's completed work and Codex's cancellation/custom-replacement fixes. Planning-only restrictions are superseded.
-- **Runtime source:** `main`, accompanying implementation commit based on `5e74bc3`; six earlier local commits and this batch were pushed as `91ea2e2`. First hosted CI failed only two OS-dependent `abit` assertions; a test-only portability correction follows.
+- **Runtime source:** `91ea2e2` contains the installed runtime; `dd40a19` adds only a portable test expectation. Both are pushed to `origin/main`. Hosted macOS 14 [CI](https://github.com/markoderic/autocorrect/actions/runs/37172260553) passed: 233 executed, 232 passed, one skipped, universal build and artifact upload succeeded. The accompanying final documentation-only commit records this outcome and skips redundant CI.
 - **Installed app:** `/Applications/AutoCorrect.app`, 0.3.10, Apple Development signed, universal x86_64/arm64; strict signature passed. Executable SHA-256 `0fcbed4e42df839c59e500c44ef351f71ea0afe43554cc6c59574443ca720e2e`. Previous installation preserved at `/Applications/AutoCorrect.previous-20261003-224624.app`.
 - **Startup:** Running from Applications; settings Overview says Ready, enabled, Accessibility/Input Monitoring Allowed and launch at login enabled. Diagnostics confirm permissions, listener and layout. No settings reset.
 - **Artifact/public release:** `dist/AutoCorrect-0.3.10-universal.zip`, SHA-256 `17caf17f64a0ffb3e77092684473fadae5dbbf382b4dd602816db0e46cabdd89`. Public release remains v0.3.7 (live verified); README/download/cask now point to its actual asset. No public release published.
 - **Validation:** Local suite **233 executed, 232 passed, 1 skipped, 0 failures**; 20 sequence tests passed, including fail-before/pass-after repair regressions. Universal release build passed. Physical typing of this batch remains unverified: prior TextEdit automation was inconclusive.
-- **Next concrete action:** Finish hosted CI for the test portability correction; record outcome. Then owner can exercise physical typing in the installed app. Developer ID/notarization and broader compatibility remain open.
+- **Next concrete action:** Owner can exercise physical typing in the installed app. Developer ID/notarization and broader compatibility remain open.
 - **Not authorized:** Sending/posting LinkedIn content. No marketing task is active.
 
 ## Entry template — copy for every task
@@ -286,7 +286,7 @@ Status: completed implementation/release work with explicit open acceptance gate
 
 ## 2026-10-03 — Codex — Install repaired app and push source
 
-- **Status:** IN PROGRESS.
+- **Status:** COMPLETE.
 - **Request:** Owner explicitly asked to install all completed changes on this Mac and push to GitHub; supersedes earlier planning-only restrictions.
 - **Starting state:** `main` at `5e74bc3`, six commits ahead of `origin/main` plus the reviewed/repaired working tree and planning documents.
 - **Plan:** Version the repaired build 0.3.10, build/sign with the existing local identity, preserve the previous app through the installer, verify startup/permissions, commit/push and inspect hosted CI. Public download links/cask will point to the actually published v0.3.7; no new public release is requested.
@@ -298,8 +298,12 @@ Status: completed implementation/release work with explicit open acceptance gate
 
 ### 2026-10-03 — Codex — Hosted dictionary portability repair
 
-- **Status:** IN PROGRESS.
+- **Status:** COMPLETE.
 - **Finding:** Source push `91ea2e2` succeeded. Hosted macOS 14 run `37172143399` failed two assertions in one existing-text scan test: its native full-text spelling query does not flag `abit`; the local macOS 27 dictionary does. The scan deliberately follows native detection; typed-boundary phrase rules are a separate path and passed.
 - **Scope:** Make the `abit` integration expectation follow independently queried native evidence, while retaining exact assertions for all other misspellings, offsets and preference exclusions. No production code change or reinstall needed.
 
 - **Local verification:** `swift test --build-system native --filter SpellingMarkEngineTests` passed all four tests; no production changes. Exact checks for stable fixtures, offsets, preferences, caret exclusion and mark bookkeeping remain. `git diff --check`, shell syntax and cask Ruby syntax passed. Pushing this test-only fix for a fresh full hosted run.
+
+- **Final hosted result:** Test-only fix `dd40a19` pushed successfully. [macOS 14 run 37172260553](https://github.com/markoderic/autocorrect/actions/runs/37172260553) **SUCCESS**: 233 tests executed, 232 passed, one gated evaluation skipped, zero failures; universal 0.3.10 build and archive upload passed. Production source is unchanged from installed `91ea2e2`, so no reinstall was necessary.
+- **Final installation/push state:** 0.3.10 remains running with permissions and login enabled. All requested source changes and the final evidence record are pushed to main. The accompanying documentation-only commit uses `[skip ci]` because tested source/tests/workflow are unchanged. Public v0.3.7 remains unchanged; no public release requested.
+- **Limitations/next:** Physical typing and editor compatibility for this batch remain unverified; owner can now test the installed update. Local development signing is retained; no Developer ID/notarization. No new accuracy, latency, battery or universal-compatibility claim.
