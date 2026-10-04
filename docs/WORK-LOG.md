@@ -6,12 +6,12 @@ This is the durable handoff between Claude, Codex and the owner. Read [CLAUDE-HA
 
 - **As of:** October 3, 2026 (America/New_York), installation complete; source push/CI in progress.
 - **Latest task:** Owner authorized installing the repaired batch and pushing GitHub. Installed 0.3.10 includes Claude's completed work and Codex's cancellation/custom-replacement fixes. Planning-only restrictions are superseded.
-- **Runtime source:** `main`, accompanying implementation commit based on `5e74bc3`; six earlier local commits and this batch are being pushed together. Hosted CI pending.
+- **Runtime source:** `main`, accompanying implementation commit based on `5e74bc3`; six earlier local commits and this batch were pushed as `91ea2e2`. First hosted CI failed only two OS-dependent `abit` assertions; a test-only portability correction follows.
 - **Installed app:** `/Applications/AutoCorrect.app`, 0.3.10, Apple Development signed, universal x86_64/arm64; strict signature passed. Executable SHA-256 `0fcbed4e42df839c59e500c44ef351f71ea0afe43554cc6c59574443ca720e2e`. Previous installation preserved at `/Applications/AutoCorrect.previous-20261003-224624.app`.
 - **Startup:** Running from Applications; settings Overview says Ready, enabled, Accessibility/Input Monitoring Allowed and launch at login enabled. Diagnostics confirm permissions, listener and layout. No settings reset.
 - **Artifact/public release:** `dist/AutoCorrect-0.3.10-universal.zip`, SHA-256 `17caf17f64a0ffb3e77092684473fadae5dbbf382b4dd602816db0e46cabdd89`. Public release remains v0.3.7 (live verified); README/download/cask now point to its actual asset. No public release published.
 - **Validation:** Local suite **233 executed, 232 passed, 1 skipped, 0 failures**; 20 sequence tests passed, including fail-before/pass-after repair regressions. Universal release build passed. Physical typing of this batch remains unverified: prior TextEdit automation was inconclusive.
-- **Next concrete action:** Finish source push and hosted CI; record outcome. Then owner can exercise physical typing in the installed app. Developer ID/notarization and broader compatibility remain open.
+- **Next concrete action:** Finish hosted CI for the test portability correction; record outcome. Then owner can exercise physical typing in the installed app. Developer ID/notarization and broader compatibility remain open.
 - **Not authorized:** Sending/posting LinkedIn content. No marketing task is active.
 
 ## Entry template — copy for every task
@@ -295,3 +295,11 @@ Status: completed implementation/release work with explicit open acceptance gate
 - **Installation outcome:** 0.3.10 universal release build succeeded using the existing Apple Development identity. Installer preserved `/Applications/AutoCorrect.previous-20261003-224624.app`, installed and launched the new app. Strict signature passed; diagnostics report both permissions, listener/layout and login enabled. Native settings UI shows Ready and Allowed permissions. An initial quit followed by AX inspection relaunched the old app; installer safely refused the running process. Quitting from its menu without reopening it allowed replacement. No user settings changed.
 - **Metadata/distribution:** Bumped source/build/release defaults to 0.3.10. Repaired README/cask links to published v0.3.7 with its live GitHub asset digest. New .10 archive digest `17caf17f64a0ffb3e77092684473fadae5dbbf382b4dd602816db0e46cabdd89`; no public release.
 - **Verification:** Existing full runtime test result retained; rebuilt both architectures after metadata changes. `git diff --check` passed. Source commit/push and hosted CI next.
+
+### 2026-10-03 — Codex — Hosted dictionary portability repair
+
+- **Status:** IN PROGRESS.
+- **Finding:** Source push `91ea2e2` succeeded. Hosted macOS 14 run `37172143399` failed two assertions in one existing-text scan test: its native full-text spelling query does not flag `abit`; the local macOS 27 dictionary does. The scan deliberately follows native detection; typed-boundary phrase rules are a separate path and passed.
+- **Scope:** Make the `abit` integration expectation follow independently queried native evidence, while retaining exact assertions for all other misspellings, offsets and preference exclusions. No production code change or reinstall needed.
+
+- **Local verification:** `swift test --build-system native --filter SpellingMarkEngineTests` passed all four tests; no production changes. Exact checks for stable fixtures, offsets, preferences, caret exclusion and mark bookkeeping remain. `git diff --check`, shell syntax and cask Ruby syntax passed. Pushing this test-only fix for a fresh full hosted run.

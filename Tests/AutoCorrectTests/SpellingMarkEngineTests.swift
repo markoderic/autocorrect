@@ -31,13 +31,25 @@ final class SpellingMarkEngineTests: XCTestCase {
 
     func testExistingTextScanMarksOnlyEligibleMisspelledWordsAndRespectsPolicy() {
         let text = "we said aswell abit teh Higgsfield codespell recieve untill next"
+        // Full-text dictionaries disagree about "abit" across macOS releases. Existing-text
+        // scans must follow native evidence; typed-boundary phrase suggestions are separate.
+        let checker = NSSpellChecker.shared
+        let tag = NSSpellChecker.uniqueSpellDocumentTag()
+        defer { checker.closeSpellDocument(withTag: tag) }
+        let native = checker.check(text, range: NSRange(location: 0, length: text.utf16.count),
+                                   types: NSTextCheckingResult.CheckingType.spelling.rawValue,
+                                   options: [.orthography: NSOrthography(dominantScript: "Latn", languageMap: ["Latn": ["en_US"]])],
+                                   inSpellDocumentWithTag: tag, orthography: nil, wordCount: nil)
+        let flagsAbit = native.contains { $0.resultType == .spelling && $0.range == (text as NSString).range(of: "abit") }
+        let expected = ["aswell"] + (flagsAbit ? ["abit"] : []) + ["teh", "codespell", "recieve", "untill"]
         let marks = engine.scanMarks(text: text, windowStart: 100, caret: 100 + text.utf16.count)
-        XCTAssertEqual(marks.map(\.word), ["aswell", "abit", "teh", "codespell", "recieve", "untill"])
+        XCTAssertEqual(marks.map(\.word), expected)
         XCTAssertEqual(marks.first?.location, 108)
         // Ignored words, custom rules, recognized technical terms and names stay unmarked.
         preferences.ignoredWords = ["untill", "codespell"]
         preferences.customCorrections = ["teh": "the"]
-        XCTAssertEqual(engine.scanMarks(text: text, windowStart: 0, caret: text.utf16.count).map(\.word), ["aswell", "abit", "recieve"])
+        XCTAssertEqual(engine.scanMarks(text: text, windowStart: 0, caret: text.utf16.count).map(\.word),
+                       expected.filter { !["teh", "codespell", "untill"].contains($0) })
         XCTAssertTrue(engine.scanMarks(text: "use nginx and kubernetes and iphone ", windowStart: 0, caret: 36).isEmpty)
         // The word at the caret is the one being typed.
         XCTAssertEqual(engine.scanMarks(text: "aswell abi", windowStart: 0, caret: 10).map(\.word), ["aswell"])
