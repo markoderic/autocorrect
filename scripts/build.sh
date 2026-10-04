@@ -3,9 +3,12 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
-VERSION="${VERSION:-0.3.9}"
+VERSION="${VERSION:-0.3.10}"
 SIGNING_IDENTITY="${SIGNING_IDENTITY:--}"
-APP="$ROOT/dist/AutoCorrect.app"
+# DIST_DIR lets a development build land somewhere other than dist/ so it cannot
+# replace a recorded archive there (e.g. DIST_DIR="$PWD/dist/dev"). Default unchanged.
+DIST_DIR="${DIST_DIR:-$ROOT/dist}"
+APP="$DIST_DIR/AutoCorrect.app"
 
 if [[ "$(uname -s)" != "Darwin" ]]; then
   echo "error: AutoCorrect must be built on macOS with Xcode Command Line Tools." >&2
@@ -17,7 +20,7 @@ done
 [[ -f Package.swift ]] || { echo "error: Package.swift is missing from $ROOT." >&2; exit 1; }
 [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "error: VERSION must have the form 0.3.7." >&2; exit 1; }
 
-mkdir -p "$ROOT/dist"
+mkdir -p "$DIST_DIR"
 STAGING="$(mktemp -d "${TMPDIR:-/tmp}/autocorrect-build.XXXXXX")"
 trap 'rm -rf "$STAGING"' EXIT
 
@@ -55,7 +58,7 @@ for ARCH in arm64 x86_64; do
 done
 
 # Only replace this script's generated output after a complete successful build.
-ZIP="$ROOT/dist/AutoCorrect-$VERSION-universal.zip"
+ZIP="$DIST_DIR/AutoCorrect-$VERSION-universal.zip"
 # Archive outside synced Documents folders before moving the finished outputs.
 ditto -c -k --sequesterRsrc --keepParent "$BUNDLE" "$STAGING/release.zip"
 rm -rf "$APP"
@@ -63,7 +66,7 @@ mv "$BUNDLE" "$APP"
 rm -f "$ZIP"
 mv "$STAGING/release.zip" "$ZIP"
 (
-  cd "$ROOT/dist"
+  cd "$DIST_DIR"
   shasum -a 256 "$(basename "$ZIP")" > "$(basename "$ZIP").sha256"
 )
 echo "Built: $APP"

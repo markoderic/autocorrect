@@ -1,12 +1,16 @@
 import Foundation
 
-/// Identifies a completed prose word after an unambiguous sentence ending.
-/// The caller owns the feature toggle, ignored/custom rules, and focused-field validation.
+/// Identifies a prose word that should start with a capital: a completed word after an
+/// unambiguous sentence ending, or the first word of a field whose start the caller has
+/// verified. The caller owns the feature toggle, ignored/custom rules, field-start
+/// evidence (focus, caret, total length) and focused-field validation.
 public enum SentenceCapitalization {
     /// Returns the word to capitalize, including a single-letter word such as "i" or "a".
     /// `caret` and the returned range use UTF-16 offsets, matching Accessibility APIs.
-    /// A sentence-ending period, question mark, or exclamation followed by whitespace is required.
-    public static func candidate(in text: String, caret: Int) -> CorrectionCandidate? {
+    /// A sentence-ending period, question mark, or exclamation followed by whitespace is
+    /// required unless `atFieldStart` is true and only whitespace or opening quotes and
+    /// brackets precede the word in `text`. `text` must then begin at the field's start.
+    public static func candidate(in text: String, caret: Int, atFieldStart: Bool = false) -> CorrectionCandidate? {
         guard caret > 0, caret <= text.utf16.count,
               let caretRange = Range(NSRange(location: caret, length: 0), in: text) else { return nil }
         let prefix = text[..<caretRange.lowerBound]
@@ -34,8 +38,36 @@ public enum SentenceCapitalization {
         let word = String(prefix[start..<end])
         guard isWord(word, maximumLength: 32), word.first?.isLowercase == true,
               !word.dropFirst().contains(where: { $0.isUppercase }),
-              followsSentenceEnd(in: prefix, wordStart: start) else { return nil }
+              followsSentenceEnd(in: prefix, wordStart: start) || (atFieldStart && startsField(prefix, wordStart: start))
+        else { return nil }
         return CorrectionCandidate(original: word, range: NSRange(start..<end, in: text))
+    }
+
+    /// The unfinished first word of an otherwise empty field, for immediate capitalization
+    /// as it is typed: `text` is everything from the verified field start to the caret and
+    /// must consist of optional whitespace/opening quotes or brackets plus one lowercase
+    /// ASCII word (at most 24 letters, one interior apostrophe). Anything else — a capital,
+    /// emoji, digit, symbol, backtick, path or URL character, a completed word — is nil.
+    public static func fieldStartCandidate(in text: String) -> CorrectionCandidate? {
+        guard !text.isEmpty, text.utf16.count <= 64 else { return nil }
+        var start = text.startIndex
+        while start < text.endIndex, isWhitespace(text[start]) || openingQuotesAndBrackets.contains(text[start]) {
+            start = text.index(after: start)
+        }
+        guard start < text.endIndex else { return nil }
+        let word = String(text[start...])
+        guard (1...24).contains(word.count), let first = word.first, first.isASCII, first.isLowercase,
+              word.last?.isLetter == true else { return nil }
+        var apostrophes = 0
+        for character in word {
+            if character == "'" || character == "’" {
+                apostrophes += 1
+                guard apostrophes <= 1 else { return nil }
+            } else {
+                guard character.isASCII, character.isLetter, character.isLowercase else { return nil }
+            }
+        }
+        return CorrectionCandidate(original: word, range: NSRange(start..<text.endIndex, in: text))
     }
 
     /// Capitalizes only the first letter; the remaining spelling and casing are preserved.
@@ -58,6 +90,11 @@ public enum SentenceCapitalization {
         "inc", "ltd", "co", "corp", "ave", "blvd", "rd", "mt", "ft", "oz", "lb", "lbs",
         "jan", "feb", "mar", "apr", "jun", "jul", "aug", "sep", "sept", "oct", "nov", "dec"
     ]
+
+    /// Only whitespace and opening quotes/brackets may precede the field's first word.
+    private static func startsField(_ prefix: Substring, wordStart: String.Index) -> Bool {
+        prefix[..<wordStart].allSatisfy { isWhitespace($0) || openingQuotesAndBrackets.contains($0) }
+    }
 
     private static func followsSentenceEnd(in prefix: Substring, wordStart: String.Index) -> Bool {
         var cursor = wordStart

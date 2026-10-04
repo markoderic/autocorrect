@@ -49,3 +49,26 @@ final class SpellingScanTests: XCTestCase {
         XCTAssertTrue(partial.isEmpty)
     }
 }
+
+extension SpellingScanTests {
+    func testCapitalizedWordsAreEligibleOnlyWhereASentenceStarts() {
+        func words(_ text: String, fieldStart: Bool) -> [String] {
+            SpellingScan.tokens(in: text, activeCaret: nil, fieldStart: fieldStart).map(\.word)
+        }
+        // The first word of the field and the word after . ? ! or a line break may carry
+        // a mark even when capitalized: automatic capitalization must not hide a typo there.
+        XCTAssertEqual(words("Teh next. Speoll ok", fieldStart: true), ["Teh", "next", "Speoll", "ok"])
+        XCTAssertEqual(words("Teh next. Speoll ok", fieldStart: false), ["next", "Speoll", "ok"])
+        XCTAssertEqual(words("  \"Teh next", fieldStart: true), ["Teh", "next"])
+        XCTAssertEqual(words("ok? Teh\nSpeoll! (Hte) fine", fieldStart: false), ["ok", "Teh", "Speoll", "Hte", "fine"])
+        // Mid-sentence capitals are still treated as names; all caps and mixed case never qualify.
+        XCTAssertEqual(words("we met Marko and Higgsfield today", fieldStart: true), ["we", "met", "and", "today"])
+        XCTAssertEqual(words("NASA said Hi", fieldStart: true), ["said"])
+        XCTAssertEqual(words("Teh, Next", fieldStart: true), ["Teh"])
+        XCTAssertEqual(words("Dr. Smith", fieldStart: true), ["Dr", "Smith"])
+        XCTAssertEqual(words("Dr. Smith", fieldStart: false), ["Smith"])
+        XCTAssertEqual(words("McDonald Said", fieldStart: true), [])
+        XCTAssertEqual(words("Teh next", fieldStart: true), ["Teh", "next"])
+        XCTAssertEqual(SpellingScan.tokens(in: "Teh next", activeCaret: 3, fieldStart: true).map(\.word), ["next"])
+    }
+}

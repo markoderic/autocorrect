@@ -106,3 +106,73 @@ extension EnglishWritingRulesTests {
             systemCorrection: nil, guesses: []), "doesn't")
     }
 }
+
+extension EnglishWritingRulesTests {
+    private func repair(_ word: String, native: String?, guesses: [String] = []) -> String? {
+        EnglishWritingRules.typoReplacement(for: word, language: "en_US", systemCorrection: native, guesses: guesses)
+    }
+
+    func testShortContractionTranspositionsNeedBothPreservedLettersAndNativeAgreement() {
+        // Native evidence recorded on macOS 27.0.1: odnt/dnot → don't, cnat → can't, wnot → won't,
+        // but dotn → down. A four-letter key is only repaired when the typed letters are a
+        // transposition of it AND the native recommendation (or top guess) names the contraction.
+        XCTAssertEqual(repair("odnt", native: "don't", guesses: ["don't", "oddest"]), "don't")
+        XCTAssertEqual(repair("Odnt", native: "Don't", guesses: ["Don't", "Oddest"]), "Don't")
+        XCTAssertEqual(repair("dnot", native: "don't"), "don't")
+        XCTAssertEqual(repair("cnat", native: "can't"), "can't")
+        XCTAssertEqual(repair("wnot", native: "won't"), "won't")
+        XCTAssertEqual(repair("odnt", native: nil, guesses: ["don't", "oddest"]), "don't")
+        XCTAssertNil(repair("dotn", native: "down", guesses: ["don", "down"]))
+        XCTAssertNil(repair("odnt", native: nil, guesses: []))
+        XCTAssertNil(repair("odnt", native: nil, guesses: ["oddest", "don't"]))
+        XCTAssertNil(repair("odnt", native: "oddest", guesses: ["don't"]))
+        // A substitution, deletion or insertion against a four-letter key is never enough,
+        // even with native agreement: dent/font/donut-like letters are not evidence of don't.
+        for word in ["dent", "font", "dnt", "dont", "donut", "ont", "odn", "odnts"] {
+            XCTAssertNil(repair(word, native: "don't", guesses: ["don't"]), word)
+        }
+        XCTAssertNil(repair("isnt", native: "isn't"))   // exact key: handled by replacement(for:)
+        XCTAssertNil(repair("ODNT", native: "don't"))   // all caps stays out of this path
+    }
+
+    func testApostropheNormalizedShortContractionsKeepTheTypedApostropheStyle() {
+        XCTAssertEqual(repair("odn't", native: "don't", guesses: ["don't"]), "don't")
+        XCTAssertEqual(repair("odn’t", native: "don't", guesses: ["don't"]), "don’t")
+        XCTAssertEqual(repair("odn’t", native: "don’t", guesses: ["don’t"]), "don’t")
+        XCTAssertEqual(repair("doen’st", native: nil), "doesn’t")
+        XCTAssertEqual(repair("doen'st", native: nil), "doesn't")
+    }
+
+    func testLeadingTranspositionOfLongerContractionNeedsNativeAgreementToo() {
+        // A swapped first pair is weaker evidence than an interior swap: odesnt is not a
+        // repair without native agreement, while the established doenst transposition is.
+        XCTAssertNil(repair("odesnt", native: nil))
+        XCTAssertEqual(repair("odesnt", native: "doesn't"), "doesn't")
+        XCTAssertEqual(repair("doenst", native: nil), "doesn't")
+        XCTAssertEqual(repair("shoudlve", native: nil), "should've")
+    }
+
+    func testAllCapsContractionNeedsAFollowingAllCapsDictionaryWord() {
+        let words: Set<String> = ["do", "that", "go", "know", "the", "it", "a", "we"]
+        // Native evidence for the lowercase form, as recorded on macOS 27.0.1.
+        let native = ["odnt": "don't", "cnat": "can't", "dotn": "down", "wont": "won't"]
+        func candidate(_ text: String, language: String = "en_US") -> ContextualWritingCandidate? {
+            EnglishWritingRules.uppercaseContractionCandidate(in: text, language: language,
+                isWord: { words.contains($0) }, nativeCorrection: { native[$0] })
+        }
+        XCTAssertEqual(candidate("ODNT DO ")?.replacement, "DON'T")
+        XCTAssertEqual(candidate("ODNT DO ")?.range, NSRange(location: 0, length: 4))
+        XCTAssertEqual(candidate("DONT DO ")?.replacement, "DON'T")
+        XCTAssertEqual(candidate("I CNAT GO ")?.replacement, "CAN'T")
+        XCTAssertEqual(candidate("I CNAT GO ")?.range, NSRange(location: 2, length: 4))
+        XCTAssertEqual(candidate("ODN’T DO ")?.replacement, "DON’T")
+        XCTAssertEqual(candidate("WONT GO!")?.replacement, "WON'T")
+        XCTAssertEqual(candidate("ODNT DO ")?.automatic, true)
+        // Isolated, unknown-neighbor, mixed-case, acronym-like and already-correct forms abstain.
+        for text in ["ODNT ", "ODNT XYZ ", "ODNT Do ", "Odnt DO ", "DON'T DO ", "DNT DO ", "ODST DO ", "ITS A ",
+                     "ODNT  DO ", "ODNT.DO ", "IM GO ", "HES GO ", "ODNT DO", "DOTN DO ", "A DO "] {
+            XCTAssertNil(candidate(text), text.debugDescription)
+        }
+        XCTAssertNil(candidate("ODNT DO ", language: "de_DE"))
+    }
+}

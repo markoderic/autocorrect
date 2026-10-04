@@ -49,13 +49,15 @@ extension JoinedWordsTests {
 
     func testCurlyApostropheEditAndJoinedWordUndo() throws {
         let engine = CorrectionEngine(preferences: Preferences(defaults: UserDefaults(suiteName: UUID().uuidString)!))
-        for word in ["doen’st", "does’nt", "doens’t", "doen'st"] {
+        // Batch 1 (October 2026): a typed curly apostrophe is kept in the repair, matching the
+        // existing i’m → I’m rule; straight input still yields a straight apostrophe.
+        for (word, expected) in [("doen’st", "doesn’t"), ("does’nt", "doesn’t"), ("doens’t", "doesn’t"), ("doen'st", "doesn't")] {
             let source = "it " + word + " next"
             let range = NSRange(location: 3, length: word.utf16.count)
             let replacement = try XCTUnwrap(engine.suggestion(word))
-            XCTAssertEqual(replacement, "doesn't")
+            XCTAssertEqual(replacement, expected, word)
             let plan = try XCTUnwrap(KeyboardReplacementPlan.make(text: source, wordRange: range, replacement: replacement))
-            XCTAssertEqual(plan.expectedText, "it doesn't next")
+            XCTAssertEqual(plan.expectedText, "it \(expected) next")
         }
         let plan = try XCTUnwrap(KeyboardReplacementPlan.make(text: "iknow next", wordRange: NSRange(location: 0, length: 5), replacement: "I know"))
         XCTAssertEqual(plan.expectedText, "I know next")

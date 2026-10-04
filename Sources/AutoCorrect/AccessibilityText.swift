@@ -54,6 +54,10 @@ enum AccessibilityText {
         let windowStart: Int
         let caret: Int
         let physicalKeyCount: UInt32
+        /// Multi-line prose control (AXTextArea) rather than a single-line field or combo
+        /// box. Field-start capitalization applies only to prose areas: a search box, address
+        /// bar, filename or subject field is not a sentence.
+        var isTextArea = true
     }
 
     static func attribute(_ element: AXUIElement, _ name: String) -> CFTypeRef? {
@@ -135,8 +139,35 @@ enum AccessibilityText {
         guard physicalKeyCount == keyCount else {
             RuntimeDiagnostics.record("snapshot: input changed"); return nil
         }
-        RuntimeDiagnostics.record("snapshot available")
-        return Snapshot(element: element, pid: pid, text: text, windowStart: start, caret: selected.location, physicalKeyCount: keyCount)
+        RuntimeDiagnostics.record(role == kAXTextAreaRole ? "snapshot available (text area)" : "snapshot available (single-line field)")
+        return Snapshot(element: element, pid: pid, text: text, windowStart: start, caret: selected.location,
+                        physicalKeyCount: keyCount, isTextArea: role == kAXTextAreaRole)
+    }
+
+    /// Evidence that `snapshot.text` is the entire content of the field, so its first word
+    /// really is the field's first word. The window must begin at offset zero and the field's
+    /// reported length (AXNumberOfCharacters, or the bounded AXValue when the editor has no
+    /// count) must end at the caret, allowing one trailing line break that rich editors keep
+    /// after the last paragraph. A window offset of zero alone proves nothing: editors that
+    /// report offsets relative to a paragraph, or a caret far into a document, fail here.
+    /// Costs one or two Accessibility reads; call it only after the text already looks like
+    /// a field start.
+    static func confirmsFieldStart(_ snapshot: Snapshot) -> Bool {
+        guard snapshot.windowStart == 0, snapshot.caret == snapshot.text.utf16.count, snapshot.caret <= 64,
+              snapshot.isTextArea else { return false }
+        if let count = (attribute(snapshot.element, kAXNumberOfCharactersAttribute) as? NSNumber)?.intValue {
+            guard count >= snapshot.caret, count <= snapshot.caret + 1 else { return false }
+            if count == snapshot.caret + 1 {
+                guard let trailing = substring(snapshot.element, range: CFRange(location: snapshot.caret, length: 1)),
+                      trailing == "\n" || trailing == "\r" else { return false }
+            }
+            return true
+        }
+        // No count: the value itself must be the snapshot text (plus at most one line break).
+        guard let value = attribute(snapshot.element, kAXValueAttribute) as? String else { return false }
+        let length = (value as NSString).length
+        guard length >= snapshot.caret, length <= snapshot.caret + 1, value.hasPrefix(snapshot.text) else { return false }
+        return length == snapshot.caret || value.hasSuffix("\n") || value.hasSuffix("\r")
     }
 
     struct Region {

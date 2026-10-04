@@ -18,13 +18,25 @@ public struct CompletedWordBacklog {
         }
     }
     public private(set) var boundaries: [Boundary] = []
+    /// Supported keystrokes since the last reset (a count only, capped; no characters).
+    public private(set) var typedSinceReset = 0
+    private var wordStarted = false
+    private var delimiterAfterWord = false
     private var previousWasDelimiter = true
     private var pendingAmbiguousPunctuation = false
     private var nextID: UInt64 = 0
     public init() {}
 
+    /// True while the keystrokes since the last reset are optional leading delimiters
+    /// (spaces, quotes, brackets) followed by one unfinished word: the only situation in
+    /// which a field-start capitalization check is worth a read.
+    public var isTypingFirstWord: Bool { wordStarted && !delimiterAfterWord }
+
     public mutating func reset() {
         boundaries.removeAll(keepingCapacity: true)
+        typedSinceReset = 0
+        wordStarted = false
+        delimiterAfterWord = false
         previousWasDelimiter = true
         pendingAmbiguousPunctuation = false
     }
@@ -33,9 +45,11 @@ public struct CompletedWordBacklog {
     /// this queue. Accept printable ASCII and explicitly supported rich-text punctuation.
     public mutating func append(_ text: String) {
         guard TypingTypography.isSupportedKeystroke(text), let character = text.first else { reset(); return }
+        typedSinceReset = min(typedSinceReset + 1, 4096)
         for index in boundaries.indices { boundaries[index].trailingUTF16 += 1 }
         boundaries.removeAll { $0.trailingUTF16 > 96 }
         let delimiter = CorrectionPolicy.isDelimiter(character)
+        if delimiter { delimiterAfterWord = delimiterAfterWord || wordStarted } else { wordStarted = true }
         // A period or colon can begin a filename extension, URL, or decimal. Wait for another
         // delimiter before touching the token; "doenst.txt" must never become "doesn't.txt".
         if delimiter && !".:".contains(character) && (!previousWasDelimiter || pendingAmbiguousPunctuation) {

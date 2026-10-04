@@ -154,3 +154,24 @@ final class KeyboardReplacementPlanTests: XCTestCase {
     }
 
 }
+
+extension KeyboardReplacementPlanTests {
+    func testCaretEndPlanReplacesOnlyTheWordBeingTyped() throws {
+        let plan = try XCTUnwrap(KeyboardReplacementPlan.make(text: "h", wordRange: NSRange(location: 0, length: 1), replacement: "H", atCaret: true))
+        XCTAssertEqual(plan.deleteCount, 1)
+        XCTAssertEqual(plan.insertion, "H")
+        XCTAssertEqual(plan.expectedText, "H")
+        XCTAssertEqual(plan.expectedCaret, 1)
+        let quoted = try XCTUnwrap(KeyboardReplacementPlan.make(text: " \"he", wordRange: NSRange(location: 2, length: 2), replacement: "He", atCaret: true))
+        XCTAssertEqual(quoted.deleteCount, 2)
+        XCTAssertEqual(quoted.expectedText, " \"He")
+        XCTAssertEqual(quoted.expectedCaret, 4)
+        // Without the explicit caret-end request a word must still be followed by a delimiter,
+        // and a caret-end plan never reaches past the caret or into a partial token.
+        XCTAssertNil(KeyboardReplacementPlan.make(text: "h", wordRange: NSRange(location: 0, length: 1), replacement: "H"))
+        XCTAssertNil(KeyboardReplacementPlan.make(text: "he ", wordRange: NSRange(location: 0, length: 2), replacement: "He", atCaret: true))
+        XCTAssertNil(KeyboardReplacementPlan.make(text: "xh", wordRange: NSRange(location: 1, length: 1), replacement: "H", atCaret: true))
+        XCTAssertNil(KeyboardReplacementPlan.make(text: "é", wordRange: NSRange(location: 0, length: 1), replacement: "É", atCaret: true))
+        XCTAssertNil(KeyboardReplacementPlan.make(text: "h", wordRange: NSRange(location: 0, length: 1), replacement: "h", atCaret: true))
+    }
+}

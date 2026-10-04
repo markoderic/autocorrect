@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VERSION="${VERSION:-0.3.9}"
+VERSION="${VERSION:-0.3.10}"
 export VERSION
 CHANNEL="${RELEASE_CHANNEL:-stable}"
 case "$CHANNEL" in

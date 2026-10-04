@@ -56,3 +56,36 @@ final class CompletedWordBacklogTests: XCTestCase {
     }
 
 }
+
+extension CompletedWordBacklogTests {
+    func testTracksTheFirstWordOfATypingSessionWithoutStoringCharacters() {
+        var queue = CompletedWordBacklog()
+        XCTAssertFalse(queue.isTypingFirstWord)
+        XCTAssertEqual(queue.typedSinceReset, 0)
+        for character in "hel" { queue.append(String(character)) }
+        XCTAssertTrue(queue.isTypingFirstWord)
+        XCTAssertEqual(queue.typedSinceReset, 3)
+        queue.append(" ")
+        XCTAssertFalse(queue.isTypingFirstWord)
+        XCTAssertEqual(queue.typedSinceReset, 4)
+        queue.append("w")
+        XCTAssertFalse(queue.isTypingFirstWord)
+        queue.reset()
+        XCTAssertFalse(queue.isTypingFirstWord)
+        XCTAssertEqual(queue.typedSinceReset, 0)
+        // A period or colon is a delimiter for this purpose even though it defers a boundary.
+        for character in "a." { queue.append(String(character)) }
+        XCTAssertFalse(queue.isTypingFirstWord)
+        queue.reset()
+        queue.append("é")
+        XCTAssertFalse(queue.isTypingFirstWord)
+        XCTAssertEqual(queue.typedSinceReset, 0)
+        // Leading spaces, quotes and brackets precede the first word rather than ending it.
+        for character in " \"(h" { queue.append(String(character)) }
+        XCTAssertTrue(queue.isTypingFirstWord)
+        XCTAssertEqual(queue.typedSinceReset, 4)
+        queue.reset()
+        queue.append(" ")
+        XCTAssertFalse(queue.isTypingFirstWord)
+    }
+}

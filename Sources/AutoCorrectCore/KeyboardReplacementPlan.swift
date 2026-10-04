@@ -14,8 +14,10 @@ public struct KeyboardReplacementPlan: Equatable, Sendable {
     /// following text is reinserted, allowing delayed correction and phrase reversal.
     /// Set `reversingExpansion` only for a recorded expansion being undone; this allows
     /// its original phrase to begin or end with punctuation or numbers.
+    /// Set `atCaret` only for the word still being typed (field-start capitalization and
+    /// its undo): the word must then end exactly at the caret, with nothing after it.
     public static func make(text: String, wordRange: NSRange, replacement: String,
-                            reversingExpansion: Bool = false) -> KeyboardReplacementPlan? {
+                            reversingExpansion: Bool = false, atCaret: Bool = false) -> KeyboardReplacementPlan? {
         let length = text.utf16.count
         guard (1...256).contains(length), wordRange.location >= 0,
               wordRange.location <= length, wordRange.length > 0,
@@ -28,12 +30,16 @@ public struct KeyboardReplacementPlan: Equatable, Sendable {
         let prefix = String(text[..<range.lowerBound])
         guard UserDictionary.isValidReplacement(original),
               reversingExpansion || (original.first?.isLetter == true && original.last?.isLetter == true),
-              original != replacement,
-              (1...96).contains(suffix.utf16.count),
-              let delimiter = suffix.first,
-              CorrectionPolicy.isDelimiter(delimiter) ||
-                (delimiter == "'" && prefix.last == "'") ||
-                (delimiter == "’" && prefix.last == "‘") else { return nil }
+              original != replacement else { return nil }
+        if atCaret {
+            guard suffix.isEmpty else { return nil }
+        } else {
+            guard (1...96).contains(suffix.utf16.count),
+                  let delimiter = suffix.first,
+                  CorrectionPolicy.isDelimiter(delimiter) ||
+                    (delimiter == "'" && prefix.last == "'") ||
+                    (delimiter == "’" && prefix.last == "‘") else { return nil }
+        }
         // Reject a range that names only the tail of a larger word/identifier.
         if let preceding = prefix.last {
             guard preceding.unicodeScalars.allSatisfy({ CharacterSet.whitespacesAndNewlines.contains($0) }) ||

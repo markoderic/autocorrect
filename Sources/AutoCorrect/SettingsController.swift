@@ -170,7 +170,8 @@ final class SettingsController: NSWindowController, NSTableViewDataSource, NSTab
         body.addArrangedSubview(card([
             toggle("Fix missing spaces", value: preferences.separatesJoinedWords, action: #selector(setJoinedWords(_:))),
             label("Separate clear two-word combinations such as iknow and thankyou.", size: 12, secondary: true),
-            toggle("Capitalize after . ? !", value: preferences.capitalizesAfterPeriod, action: #selector(setCapitals(_:))),
+            toggle("Capitalize sentence starts", value: preferences.capitalizesAfterPeriod, action: #selector(setCapitals(_:))),
+            label("Capitalizes the first letter you type in an empty text area and the word after . ? ! once it is complete. Deliberately retyping a lowercase letter keeps it.", size: 12, secondary: true),
             toggle("Show spelling underlines", value: preferences.showsSpellingIndicators, action: #selector(setUnderlines(_:))),
             label("Marks the latest possible misspelling where the editor exposes its position. Other apps’ spelling settings stay unchanged.", size: 12, secondary: true)
         ]))

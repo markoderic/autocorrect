@@ -1,6 +1,6 @@
 cask "autocorrect" do
-  version "0.3.9"
-  sha256 "54b24f219f5e0c4d6ddae4b27b8bf4266c3a3efd83f7dfd74eb2c9c3c9091f24"
+  version "0.3.7"
+  sha256 "c4aca31312137dcc3f549d344968277c8d6aa097b8040e8263d0efa717df25ff"
 
   url "https://github.com/markoderic/autocorrect/releases/download/v#{version}/AutoCorrect-#{version}-universal.zip"
   name "AutoCorrect"
