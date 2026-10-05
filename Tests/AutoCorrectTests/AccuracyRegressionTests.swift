@@ -43,9 +43,17 @@ final class AccuracyRegressionTests: XCTestCase {
         for word in ["screenshot", "screenshots", "homebrew", "har", "that", "her", "hat"] {
             XCTAssertNil(engine.suggestion(in: word + " "), word)
         }
-        for (source, expected) in ["tht": "that", "wih": "with", "ths": "this", "speling": "spelling", "capitazed": "capitalized"] {
+        for (source, expected) in ["tht": "that", "wih": "with", "ths": "this", "speling": "spelling"] {
             XCTAssertEqual(engine.suggestion(in: source + " "), expected, source)
         }
+    }
+
+    func testAmbiguousNativeDoubleOmissionNeverChoosesCompetingWord() {
+        // Hosted macOS 14 can rank "captioned" before "capitalized". The confidence
+        // policy intentionally abstains on those competing guesses (also covered with
+        // fixed ranks in IsolatedSpellingFallbackTests). Local macOS 27 corrects it.
+        let result = engine.suggestion(in: "capitazed ")
+        XCTAssertTrue(result == nil || result == "capitalized", "Unexpected automatic edit: \(String(describing: result))")
     }
 
     func testContextWaitsForMeaningAndThenCorrectsAutomatically() {
