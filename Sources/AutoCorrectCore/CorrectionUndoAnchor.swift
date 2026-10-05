@@ -36,6 +36,15 @@ public struct CorrectionUndoAnchor: Equatable, Sendable {
         anchorUTF16 = Array(text[start..<span.upperBound].utf16)
     }
 
+    /// The corrected span's absolute UTF-16 range in the editor.
+    public var absoluteTargetRange: NSRange { targetRange }
+    /// The saved context (up to 32 preceding units) plus the span, absolute. A bounded read of
+    /// exactly this range, passed to `matchingRange(in:windowStart:)` with this location as the
+    /// window start, re-verifies the record without reading anything else.
+    public var absoluteContextRange: NSRange {
+        NSRange(location: anchorLocation, length: anchorUTF16.count)
+    }
+
     /// Returns the target range local to a fresh snapshot, only when its entire
     /// saved prefix and replacement are present at the original absolute offsets.
     /// Continued typing after the span is permitted; moved or changed spans fail.

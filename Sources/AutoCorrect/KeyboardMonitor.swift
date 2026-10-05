@@ -4,8 +4,11 @@ import AutoCorrectCore
 
 final class KeyboardMonitor {
     var onKey: ((String?, CGEventFlags, Int64) -> Void)?
-    var onMouse: (() -> Void)?
+    /// Mouse-down or scroll anywhere on the system, with the event type and Quartz location.
+    var onMouse: ((CGEventType, CGPoint) -> Void)?
     var onUndo: (() -> Bool)?
+    /// Control-Option-Command-/ : show the Undo popup for the latest correction. Consumed when handled.
+    var onShowPopup: (() -> Bool)?
     private var tap: CFMachPort?
     private var source: CFRunLoopSource?
     private struct PendingEdit {
@@ -52,9 +55,10 @@ final class KeyboardMonitor {
                 if let tap = monitor.tap { CGEvent.tapEnable(tap: tap, enable: true) }
             } else if type == .keyDown {
                 monitor.cancelEdit()
-                if event.getIntegerValueField(.keyboardEventKeycode) == 6,
-                   event.flags.intersection([.maskControl, .maskAlternate, .maskCommand, .maskShift]) == [.maskControl, .maskAlternate, .maskCommand],
-                   monitor.onUndo?() == true { return nil }
+                let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
+                let chord = event.flags.intersection([.maskControl, .maskAlternate, .maskCommand, .maskShift]) == [.maskControl, .maskAlternate, .maskCommand]
+                if keyCode == 6, chord, monitor.onUndo?() == true { return nil }
+                if keyCode == 44, chord, monitor.onShowPopup?() == true { return nil }
                 var buffer = [UniChar](repeating: 0, count: 8)
                 var length = 0
                 event.keyboardGetUnicodeString(maxStringLength: buffer.count, actualStringLength: &length, unicodeString: &buffer)
@@ -63,7 +67,7 @@ final class KeyboardMonitor {
             } else if type != .flagsChanged {
                 monitor.cancelEdit()
                 RuntimeDiagnostics.record(type == .scrollWheel ? "scroll event" : "mouse event")
-                monitor.onMouse?()
+                monitor.onMouse?(type, event.location)
             }
             return Unmanaged.passUnretained(event)
         }, userInfo: Unmanaged.passUnretained(self).toOpaque()) else { return false }

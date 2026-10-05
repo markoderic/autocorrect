@@ -68,6 +68,99 @@ final class FieldStartSequenceTests: XCTestCase {
         engine.processBoundaries(using: host.snapshot())
     }
 
+    func testDeletingFirstAttemptStartsFreshWithCapitalizationOnAndOff() {
+        for capitals in [true, false] {
+            engine.invalidate(); host.text = ""
+            preferences.capitalizesAfterPeriod = capitals
+            type("teh ")
+            engine.debugDeleteKey()
+            host.text = ""
+            type("lets do that ")
+            for _ in 0..<4 { engine.processBoundaries(using: host.snapshot()) }
+            XCTAssertEqual(host.text, capitals ? "Let's do that " : "let's do that ")
+        }
+    }
+
+    func testFullyDeletingCapitalizedFirstWordAllowsSameInitialAgain() {
+        type("h"); type("ello")
+        engine.debugDeleteKey(); host.text = ""
+        type("h"); type("owever ")
+        XCTAssertEqual(host.text, "However ")
+    }
+
+    func testReportedDeadlineSentenceAndUndoAfterFollowingText() {
+        type("lets do that byu this date ")
+        for _ in 0..<8 { engine.processBoundaries(using: host.snapshot()) }
+        XCTAssertEqual(host.text, "Let's do that by this date ")
+        type("please ")
+        engine.undo()
+        XCTAssertEqual(host.text, "Let's do that byu this date please ")
+    }
+
+    func testAmbiguousByuWaitsForTheCompletedDeadline() {
+        preferences.capitalizesAfterPeriod = false
+        type("lets do that byu ")
+        XCTAssertEqual(host.text, "let's do that byu ")
+        type("this ")
+        XCTAssertEqual(host.text, "let's do that byu this ")
+        type("date ")
+        XCTAssertEqual(host.text, "let's do that by this date ")
+    }
+
+    func testFastRestartAndDeadlineKeepsFollowingIncompleteText() {
+        type("teh ")
+        engine.debugDeleteKey(); host.text = ""
+        typeFast("lets do that byu this date nex")
+        for _ in 0..<8 { engine.processBoundaries(using: host.snapshot()) }
+        XCTAssertEqual(host.text, "Let's do that by this date nex")
+    }
+
+    func testFreshSingleLineFieldAlsoDropsThePreviousRejection() {
+        preferences.capitalizesAfterPeriod = false
+        host.isTextArea = false
+        type("teh ")
+        engine.debugDeleteKey(); host.text = ""
+        type("lets do that ")
+        XCTAssertEqual(host.text, "let's do that ")
+    }
+
+    func testUnverifiedFieldRestartRetainsExistingProtection() {
+        type("teh ")
+        engine.debugDeleteKey(); host.text = ""
+        engine.fieldStartConfirmation = { _ in false } // unreadable length or retained suffix
+        type("teh ")
+        XCTAssertEqual(host.text, "teh ")
+    }
+
+    func testExplicitUndoStillKeepsTheOriginalSpelling() {
+        preferences.capitalizesAfterPeriod = false
+        type("lets do ")
+        XCTAssertEqual(host.text, "let's do ")
+        engine.undo()
+        type("that ")
+        XCTAssertEqual(host.text, "lets do that ")
+    }
+
+    func testSentenceContextHonorsApprovalAndUserOverrides() {
+        preferences.capitalizesAfterPeriod = false
+        preferences.asksBeforeCorrecting = true
+        type("do that byu this date ")
+        XCTAssertEqual(host.text, "do that byu this date ")
+        XCTAssertEqual(engine.pending?.replacement, "by")
+        engine.approve()
+        XCTAssertEqual(host.text, "do that by this date ")
+
+        for kind in ["ignored", "custom", "contextOff"] {
+            engine.invalidate(); host.text = ""
+            preferences.asksBeforeCorrecting = false
+            preferences.ignoredWords = kind == "ignored" ? ["byu"] : []
+            preferences.customCorrections = kind == "custom" ? ["byu": "BYU"] : [:]
+            preferences.checksContext = kind != "contextOff"
+            type("do that byu this date ")
+            XCTAssertEqual(host.text, kind == "custom" ? "do that BYU this date " : "do that byu this date ", kind)
+        }
+    }
+
     // MARK: Fix 1 — completed-token casing after the immediate capital
 
     func testCanceledReconciliationRetriesWithFollowingTextIntact() throws {
@@ -235,19 +328,17 @@ final class FieldStartSequenceTests: XCTestCase {
         XCTAssertEqual(host.text, "GitHub ", "capitalization off: no immediate edit, casing still applies at the delimiter")
     }
 
-    func testDeliberateLowercaseRetypeWinsAndCausesNoLoop() {
+    func testExplicitCapitalizationUndoWinsAndCausesNoLoop() {
         type("g")
         XCTAssertEqual(host.text, "G")
-        // Backspace, then the lowercase letter again, then the rest of the word.
-        engine.debugNoteManualEdit()
-        host.text = ""
-        type("g")
+        // Explicit Undo rejects capitalization; deleting the whole attempt instead starts fresh.
+        engine.undo()
         XCTAssertEqual(host.text, "g")
         type("ithub ")
         XCTAssertEqual(host.text, "github ")
         type("is here ")
         XCTAssertEqual(host.text, "github is here ")
-        XCTAssertEqual(engine.correctionCount, 1)
+        XCTAssertEqual(engine.correctionCount, 0)
     }
 
     // MARK: Fix 2 — undo after continued typing

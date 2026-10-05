@@ -42,6 +42,12 @@ public enum ContextualWritingRules {
     private static let predicateComplements: Set<String> = ["to", "for", "that", "because", "if", "when", "now", "today", "already", "again", "enough"]
     private static let degreeAdverbs: Set<String> = ["really", "very", "quite", "pretty", "so", "too", "already", "still", "almost"]
 
+    /// A three-letter transposition can also contain an extra letter: "byu" can mean
+    /// "buy" or "by". Do not let the isolated spelling pass decide before syntax arrives.
+    public static func needsFollowingContext(_ word: String) -> Bool {
+        word == "byu" || word == "Byu"
+    }
+
     /// Looks back at most three completed words. Ordinary spaces must separate the
     /// relevant words; punctuation, structured text, and incomplete words stop a match.
     public static func candidate(in completedText: String) -> ContextualWritingCandidate? {
@@ -60,7 +66,7 @@ public enum ContextualWritingRules {
             let range = matches[index].range
             let original = text.substring(with: range)
             let normalized = original.lowercased().replacingOccurrences(of: "’", with: "'")
-            guard (["its", "it's", "pleas"].contains(normalized) || invitationForms.contains(normalized)),
+            guard (["its", "it's", "pleas", "byu"].contains(normalized) || invitationForms.contains(normalized)),
                   !original.dropFirst().contains(where: { $0.isUppercase }),
                   isWordBoundary(before: range.location, in: completedText) else { continue }
             let following = Array(matches[(index + 1)...])
@@ -74,7 +80,30 @@ public enum ContextualWritingRules {
             var replacement: String?
             var explanation = ""
             var automatic = false
-            if normalized == "pleas", startsClause(at: range.location, in: text),
+            if normalized == "byu" {
+                // Require an ordinary-space clause prefix and a completed object before
+                // a deadline. Only repair the original typo; never rewrite a valid "buy".
+                let prefix = text.substring(to: range.location)
+                let clause = (prefix.components(separatedBy: CharacterSet(charactersIn: ".!?\n")).last ?? prefix).replacingOccurrences(of: "’", with: "'")
+                let before = clause.trimmingCharacters(in: .whitespaces).lowercased().split(separator: " ").map(String.init)
+                let plainPrefix = clause.allSatisfy { $0.isASCII && ($0.isLetter || $0 == " " || $0 == "'" || $0 == ",") }
+                let actions: Set<String> = ["do", "finish", "complete", "send", "submit", "deliver", "review", "approve", "update", "fix", "prepare", "file", "return"]
+                let object = before.last.map { ["it", "this", "that", "them"].contains($0) } == true
+                let deadline = after.count >= 2 && ["this", "that", "the"].contains(after[0])
+                    && ["date", "deadline", "time", "morning", "afternoon", "evening", "week", "month", "year"].contains(after[1])
+                if plainPrefix, object, before.dropLast().suffix(4).contains(where: actions.contains), deadline {
+                    replacement = "by"
+                    automatic = true
+                    explanation = "This completed action has a deadline, introduced by ‘by’."
+                } else if plainPrefix, before.last == "to", before.count >= 2,
+                          ["want", "need", "plan", "intend", "going", "like"].contains(before[before.count - 2]),
+                          after.count >= 2, ["a", "an", "the", "this", "that", "some", "more"].contains(after[0]),
+                          ["book", "car", "house", "ticket", "tickets", "food", "milk", "coffee", "computer", "phone"].contains(after[1]) {
+                    replacement = "buy"
+                    automatic = true
+                    explanation = "This purchase uses the verb ‘buy’."
+                }
+            } else if normalized == "pleas", startsClause(at: range.location, in: text),
                invitationVerbs.union(["help", "let", "tell", "explain", "confirm", "reply", "respond", "remember", "leave", "wait"]).contains(after[0]) {
                 replacement = "please"
                 explanation = "This request uses ‘please’. The plural noun ‘pleas’ is preserved in other contexts."

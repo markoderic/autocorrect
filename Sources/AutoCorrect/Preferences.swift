@@ -16,6 +16,11 @@ final class Preferences {
         get { defaults.string(forKey: "language") ?? "en_US" }
         set { defaults.set(newValue, forKey: "language") }
     }
+    /// The Undo popup beside the latest correction (independent of correction itself).
+    var showsCorrectionPopup: Bool {
+        get { defaults.object(forKey: "showsCorrectionPopup") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "showsCorrectionPopup") }
+    }
     var showsSpellingIndicators: Bool {
         get { defaults.object(forKey: "showsSpellingIndicators") as? Bool ?? true }
         set { defaults.set(newValue, forKey: "showsSpellingIndicators") }

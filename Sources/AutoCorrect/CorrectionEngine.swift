@@ -38,8 +38,19 @@ final class CorrectionEngine {
     private var inFlight = false
     private var readAttempts = 0
     private var undoAnchor: CorrectionUndoAnchor?
+    /// Identity of the one correction that can currently be undone. Every popup action is bound
+    /// to this id; an action created for an older record is refused.
+    private(set) var undoRecordID: UUID?
+    private var popup = CorrectionPopup()
+    private var popupExpiryWork: DispatchWorkItem?
+    private var popupMode: CorrectionPopup.Mode = .dot
+    private var popupDismissedID: UUID?
+    private(set) var popupStatus = "Popup: none"
     private var attemptedBoundaries: [UInt64: Int] = [:]
     private var manualRewrites = ManualRewriteProtection()
+    // A deletion may empty the editor. The next typing snapshot must prove a new field
+    // attempt before old occurrence-level rejection records are discarded.
+    private var pendingDeletionRestart = false
     private var rewriteField: (pid: pid_t, element: AXUIElement, id: UUID)?
     // Persistent spelling marks for the focused field: the model, the occurrences the user
     // deliberately kept, the field they belong to, and the debounced scan/render work.
@@ -76,9 +87,28 @@ final class CorrectionEngine {
     var editTransport: ((Proposal, KeyboardReplacementPlan, @escaping (String?) -> Void) -> Void)?
     /// Deliver a printable key through the real session/proposal invalidation path.
     func debugTypeKey(_ text: String) { key(text, flags: [], keyCode: 0) }
+    /// Test hooks for the popup path: a headless popup (placement and bindings without windows),
+    /// injected geometry, the record's context text and the focus check.
+    var popupGeometryProvider: ((NSRange) -> CorrectionPopup.Geometry?)?
+    var undoContextReader: ((NSRange) -> String?)?
+    var popupFieldFocused: (() -> Bool)?
+    var debugPopup: CorrectionPopup { popup }
+    func debugInstallHeadlessPopup() {
+        popup = CorrectionPopup(makesWindows: false)
+        wirePopup()
+    }
+    func debugRenderPopup() { renderPopup() }
+    /// Test hook: ages the current undo record so expiry can be exercised without waiting.
+    func debugBackdateUndoRecord(seconds: TimeInterval) {
+        guard let saved = undoProposal else { return }
+        undoProposal = Proposal(snapshot: saved.snapshot, range: saved.range, original: saved.original,
+                                replacement: saved.replacement, created: saved.created.addingTimeInterval(-seconds),
+                                typed: saved.typed, capitalizesFieldStart: saved.capitalizesFieldStart)
+    }
     /// Test seam for the fresh read that undo takes (nil uses Accessibility).
     var snapshotProvider: (() -> AccessibilityText.Snapshot?)?
     /// Test hook: what a Backspace or navigation key does to the typing session.
+    func debugDeleteKey() { key(nil, flags: [], keyCode: 51) }
     func debugNoteManualEdit() {
         manualRewrites.noteManualEdit(now: ProcessInfo.processInfo.systemUptime)
         resetTyping()
@@ -97,19 +127,86 @@ final class CorrectionEngine {
     init(preferences: Preferences) {
         self.preferences = preferences
         monitor.onKey = { [weak self] text, flags, key in self?.key(text, flags: flags, keyCode: key) }
-        monitor.onMouse = { [weak self] in
-            self?.manualRewrites.noteManualEdit(now: ProcessInfo.processInfo.systemUptime)
-            self?.resetTyping(); self?.indicator.hide()
-            // Clicks and scrolling move text under the marks; redraw once the view settles,
-            // and scan the region that may have scrolled into view.
-            self?.scheduleRender(delay: 250)
-            self?.scheduleScan(delay: 450)
-        }
+        monitor.onMouse = { [weak self] type, location in self?.handleMouse(type: type, location: location) }
         monitor.onUndo = { [weak self] in
             guard let self, self.undoProposal != nil, !self.inFlight else { return false }
             DispatchQueue.main.async { self.undo() }
             return true
         }
+        monitor.onShowPopup = { [weak self] in
+            guard let self, self.preferences.showsCorrectionPopup, self.undoRecordID != nil else { return false }
+            DispatchQueue.main.async { self.showPopupForLatestCorrection() }
+            return true
+        }
+        wirePopup()
+    }
+
+    private func wirePopup() {
+        popup.onUndo = { [weak self] id in self?.undo(recordID: id) }
+        popup.onDismiss = { [weak self] id in
+            guard let self, id == self.undoRecordID else { return }
+            self.popupDismissedID = id
+            self.popupStatus = "Popup: dismissed for this correction"
+            self.onChange?()
+        }
+        popup.onExpand = { [weak self] id in
+            guard let self, id == self.undoRecordID else { return }
+            self.popupMode = .capsule
+            self.renderPopup()
+        }
+        popup.onCollapsed = { [weak self] id in
+            guard let self, id == self.undoRecordID else { return }
+            self.popupMode = .dot
+            self.renderPopup()
+        }
+    }
+
+    /// A system mouse-down or scroll. A click that lands on the popup belongs to the popup's own
+    /// controls: it must not reset the typing session or hide the popup before the button acts.
+    /// Everything else (editor clicks, scrolling) invalidates typing state, hides the overlays
+    /// and redraws them once the view settles.
+    func handleMouse(type: CGEventType, location: CGPoint) {
+        if type != .scrollWheel, popup.contains(quartzPoint: location) {
+            RuntimeDiagnostics.record("mouse inside popup")
+            return
+        }
+        pendingDeletionRestart = false
+        manualRewrites.noteManualEdit(now: ProcessInfo.processInfo.systemUptime)
+        resetTyping()
+        indicator.hide()
+        // A click elsewhere or a scroll quiets the capsule to the indicator.
+        if popupMode == .capsule { popupMode = .dot }
+        popup.hide()
+        // Clicks and scrolling move text under the marks; redraw once the view settles,
+        // and scan the region that may have scrolled into view.
+        scheduleRender(delay: 250)
+        scheduleScan(delay: 450)
+    }
+
+    /// Control-Option-Command-/ or the menu: reopen the capsule for the latest correction.
+    func showPopupForLatestCorrection() {
+        guard preferences.showsCorrectionPopup, undoRecordID != nil else { return }
+        popupDismissedID = nil
+        popupMode = .capsule
+        renderPopup()
+    }
+
+    /// The popup setting changed: redraw or hide without dropping the correction record.
+    func popupSettingChanged() {
+        if !preferences.showsCorrectionPopup { popup.hide(); popupStatus = "Popup: off"; onChange?() }
+        scheduleRender(delay: 0)
+    }
+
+    /// Undo bound to a specific correction. A popup built for an older record never undoes a
+    /// newer one: the id must be the current record's id.
+    func undo(recordID: UUID, andIgnore: Bool = false) {
+        guard recordID == undoRecordID else {
+            RuntimeDiagnostics.record("popup: stale undo refused")
+            status = "That correction is no longer the latest; nothing changed"
+            onChange?()
+            return
+        }
+        undo(andIgnore: andIgnore)
     }
 
     func refresh() {
@@ -143,12 +240,17 @@ final class CorrectionEngine {
     }
 
     func invalidate() {
+        pendingDeletionRestart = false
         resetTyping()
         manualRewrites.reset()
         rewriteField = nil
         pending = nil
         undoProposal = nil
         undoAnchor = nil
+        undoRecordID = nil
+        popupDismissedID = nil
+        popup.clear()
+        popupStatus = "Popup: none"
         autoCapital = nil
         backlog.reset()
         attemptedBoundaries.removeAll()
@@ -185,16 +287,21 @@ final class CorrectionEngine {
             && backlog.isTypingFirstWord && backlog.typedSinceReset <= 32
     }
 
-    private func confirmsFieldStart(_ snapshot: AccessibilityText.Snapshot) -> Bool {
+    private func confirmsFieldStart(_ snapshot: AccessibilityText.Snapshot, requireTextArea: Bool = true) -> Bool {
         #if DEBUG
         if let fieldStartConfirmation { return fieldStartConfirmation(snapshot) }
         #endif
-        let confirmed = AccessibilityText.confirmsFieldStart(snapshot)
+        let confirmed = AccessibilityText.confirmsFieldStart(snapshot, requireTextArea: requireTextArea)
         RuntimeDiagnostics.record(confirmed ? "field start confirmed" : "field start not confirmed")
         return confirmed
     }
 
     private func key(_ text: String?, flags: CGEventFlags, keyCode: Int64) {
+        if [51, 117].contains(keyCode) { pendingDeletionRestart = true }
+        else if flags.contains(.maskCommand) || flags.contains(.maskControl) || flags.contains(.maskAlternate)
+                    || [36, 48, 53, 76, 115, 116, 119, 121, 123, 124, 125, 126].contains(keyCode) {
+            pendingDeletionRestart = false
+        }
         if [51, 117].contains(keyCode) || (keyCode == 6 && flags.contains(.maskCommand) && !flags.contains(.maskShift)) {
             manualRewrites.noteManualEdit(now: ProcessInfo.processInfo.systemUptime)
         }
@@ -204,6 +311,9 @@ final class CorrectionEngine {
         flaggedWord = nil
         // Text moves while typing; marks stay in the model and are redrawn after a pause.
         indicator.hide()
+        if popupMode == .capsule { popupMode = .dot }
+        popup.hide()
+        if undoRecordID != nil, preferences.showsCorrectionPopup { scheduleRender(delay: 400) }
         if hadProposal { status = "Ready"; onChange?() }
         if keyCode == 9, flags.contains(.maskCommand) { scheduleScan(delay: 600) }   // paste
         guard preferences.enabled, !flags.contains(.maskCommand), !flags.contains(.maskControl), !flags.contains(.maskAlternate),
@@ -214,12 +324,12 @@ final class CorrectionEngine {
         attemptedBoundaries = attemptedBoundaries.filter { entry in backlog.boundaries.contains { $0.id == entry.key } }
         // A letter starting (or continuing) the first word of a session may need immediate
         // capitalization; later letters retry an edit that a fast next key invalidated.
-        guard !backlog.boundaries.isEmpty || (needsFieldStartCheck && text.first?.isLowercase == true) else { return }
+        guard pendingDeletionRestart || !backlog.boundaries.isEmpty || (needsFieldStartCheck && text.first?.isLowercase == true) else { return }
         scheduleCheck()
     }
 
     private func scheduleCheck(delay: Int = 18) {
-        guard !inFlight, !backlog.boundaries.isEmpty || needsFieldStartCheck else { return }
+        guard !inFlight, !backlog.boundaries.isEmpty || needsFieldStartCheck || pendingDeletionRestart else { return }
         work?.cancel()
         let ticket = generation
         let task = DispatchWorkItem { [weak self] in
@@ -253,6 +363,7 @@ final class CorrectionEngine {
     /// automatic repairs post edits; rendering happens after the pass.
     func processBoundaries(using snapshot: AccessibilityText.Snapshot) {
         adoptField(snapshot.element, pid: snapshot.pid)
+        reconcileDeletionRestart(using: snapshot)
         markSet.reconcile(text: snapshot.text, windowStart: snapshot.windowStart)
         overridden.reconcile(text: snapshot.text, windowStart: snapshot.windowStart)
         if capitalizeFieldStart(using: snapshot) { return }
@@ -321,6 +432,25 @@ final class CorrectionEngine {
             }
             backlog.remove(boundary.id)
         }
+    }
+
+    /// Count only newly typed keys after the deletion. If they cover the entire verified
+    /// field, this is a fresh attempt, not a rejection of the old spelling at offset zero.
+    /// A retained suffix, selection/navigation, or missing evidence keeps normal protection.
+    private func reconcileDeletionRestart(using snapshot: AccessibilityText.Snapshot) {
+        guard pendingDeletionRestart, backlog.typedSinceReset > 0 else { return }
+        pendingDeletionRestart = false
+        guard snapshot.windowStart == 0,
+              snapshot.text.utf16.count <= backlog.typedSinceReset,
+              confirmsFieldStart(snapshot, requireTextArea: false) else { return }
+        manualRewrites.reset()
+        overridden.removeAll()
+        undoProposal = nil
+        undoAnchor = nil
+        undoRecordID = nil
+        popup.clear()
+        popupStatus = "Popup: none"
+        RuntimeDiagnostics.record("fresh field attempt after deletion")
     }
 
     private func retryRead() -> Bool {
@@ -425,6 +555,9 @@ final class CorrectionEngine {
             // The user asked for the original spelling back: keep that occurrence unmarked.
             noteOverride(SpellingMark(location: editLocation, word: proposal.replacement))
             autoCapital = nil
+            undoRecordID = nil
+            popup.clear()
+            popupStatus = "Popup: none"
         } else if proposal.capitalizesFieldStart {
             // The field's first letter is now capitalized: no further reads this session,
             // and the completed token will be judged as typed.
@@ -446,6 +579,20 @@ final class CorrectionEngine {
                 range: NSRange(location: reverseRange.location - clipped, length: reverseRange.length))
             undoProposal = Proposal(snapshot: proposal.snapshot, range: reverseRange,
                 original: (observed as NSString).substring(with: reverseRange), replacement: proposal.typed ?? proposal.original, created: Date())
+            // A new record gets a new identity. It starts as the quiet indicator; details open
+            // only on a deliberate click or the documented shortcut.
+            let id = UUID()
+            undoRecordID = id
+            popupDismissedID = nil
+            popupMode = .dot
+            // Expiry removes the popup even when nothing else happens in the field.
+            popupExpiryWork?.cancel()
+            let expiry = DispatchWorkItem { [weak self] in
+                guard let self, self.undoRecordID == id else { return }
+                self.renderPopup()
+            }
+            popupExpiryWork = expiry
+            DispatchQueue.main.asyncAfter(deadline: .now() + 300.5, execute: expiry)
         }
         status = isUndo ? "Correction undone" : "Ready"
         onChange?()
@@ -564,9 +711,9 @@ final class CorrectionEngine {
 
     private func handleFieldEvent(_ event: FieldObserver.Event) {
         switch event {
-        case .valueChanged: scheduleScan(delay: 500)
+        case .valueChanged: scheduleScan(delay: 500); scheduleRender(delay: 150)
         case .selectionChanged: scheduleRender(delay: 150)
-        case .windowMoved, .windowResized: indicator.hide(); scheduleRender(delay: 120)
+        case .windowMoved, .windowResized: indicator.hide(); popup.hide(); scheduleRender(delay: 120)
         case .focusChanged: invalidate(); scheduleScan(delay: 300)
         case .deactivated, .destroyed: invalidate()
         }
@@ -653,7 +800,7 @@ final class CorrectionEngine {
     private func scheduleRender(delay: Int) {
         renderWork?.cancel()
         guard !suppressesRendering else { return }
-        let task = DispatchWorkItem { [weak self] in self?.renderMarks() }
+        let task = DispatchWorkItem { [weak self] in self?.renderMarks(); self?.renderPopup() }
         renderWork = task
         DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(delay), execute: task)
     }
@@ -675,6 +822,87 @@ final class CorrectionEngine {
             ? "Underlines: \(markSet.marks.count) found, geometry unavailable in this field"
             : "Underlines: " + parts.joined(separator: ", ")
         if text != underlineStatus { underlineStatus = text; onChange?() }
+    }
+
+    /// Draws the Undo popup (capsule or dot) beside the latest verified correction. Every step
+    /// is a bounded Accessibility read of the recorded field; any doubt hides the popup and says
+    /// so in the status line instead of guessing a position or keeping a stale record.
+    private func renderPopup() {
+        guard !suppressesRendering else { return }
+        func report(_ text: String) { if popupStatus != text { popupStatus = text; onChange?() } }
+        guard preferences.showsCorrectionPopup else { popup.hide(); report("Popup: off"); return }
+        guard preferences.enabled, let saved = undoProposal, let anchor = undoAnchor, let id = undoRecordID else {
+            popup.clear(); report("Popup: none"); return
+        }
+        guard Date().timeIntervalSince(saved.created) < 300 else {
+            undoProposal = nil; undoAnchor = nil; undoRecordID = nil
+            popup.clear(); report("Popup: none (correction expired)"); return
+        }
+        guard id != popupDismissedID else { popup.hide(); report("Popup: dismissed for this correction"); return }
+        var focused = NSWorkspace.shared.frontmostApplication?.processIdentifier == saved.snapshot.pid
+        if focused, let current = AccessibilityText.focusedElement(pid: saved.snapshot.pid) { focused = CFEqual(current, saved.snapshot.element) } else { focused = false }
+        #if DEBUG
+        if let popupFieldFocused { focused = popupFieldFocused() }
+        #endif
+        guard focused else { popup.hide(); report("Popup: hidden until the corrected field is focused again"); return }
+        let element = saved.snapshot.element
+        // Re-verify the record with a bounded read of exactly its saved context and span.
+        let context = anchor.absoluteContextRange
+        var contextText = AccessibilityText.substring(element, range: CFRange(location: context.location, length: context.length))
+        #if DEBUG
+        if let undoContextReader { contextText = undoContextReader(context) }
+        #endif
+        // An unreadable context is not evidence that the text changed: hide and keep the record,
+        // so a later successful read (or keyboard Undo, which re-reads) can still use it.
+        guard let text = contextText else {
+            popup.hide(); report("Popup: hidden (text could not be read right now)"); return
+        }
+        guard anchor.matchingRange(in: text, windowStart: context.location) != nil else {
+            undoProposal = nil; undoAnchor = nil; undoRecordID = nil
+            popup.clear(); report("Popup: none (corrected text changed, no longer undoable)"); return
+        }
+        let target = anchor.absoluteTargetRange
+        var geometry: CorrectionPopup.Geometry?
+        #if DEBUG
+        if let popupGeometryProvider { geometry = popupGeometryProvider(target) } else { geometry = popupGeometry(for: target, element: element) }
+        #else
+        geometry = popupGeometry(for: target, element: element)
+        #endif
+        guard let geometry else { popup.hide(); report("Popup: word position unavailable in this app"); return }
+        // The undo proposal reverses the edit, so its "original" is the replacement now on screen.
+        let content = CorrectionPopup.Content(id: id, original: saved.replacement, replacement: saved.original)
+        let shown = popup.show(content, mode: popupMode, geometry: geometry)
+        report(shown ? (popupMode == .capsule ? "Popup: beside the word" : "Popup: indicator after the word's line")
+                     : (popupMode == .capsule ? "Popup: no placement that avoids the caret or the screen edge"
+                                              : "Popup: indicator has no safe place on this line"))
+    }
+
+    /// Verified geometry for the corrected span from Accessibility: single-line word rectangle
+    /// (first and last character rectangles must agree), the last visible character of the
+    /// word's line, the caret and the visible area. Nil means no popup.
+    private func popupGeometry(for target: NSRange, element: AXUIElement) -> CorrectionPopup.Geometry? {
+        AXUIElementSetMessagingTimeout(element, 0.02)
+        guard target.length > 0 else { return nil }
+        let wordRect = SpellingIndicator.bounds(for: CFRange(location: target.location, length: target.length), element: element)
+        let firstRect = SpellingIndicator.bounds(for: CFRange(location: target.location, length: 1), element: element)
+        let lastRect = SpellingIndicator.bounds(for: CFRange(location: NSMaxRange(target) - 1, length: 1), element: element)
+        guard let word = CorrectionPopup.verifiedWord(word: wordRect, first: firstRect, last: lastRect) else { return nil }
+        var lineEnd: CGRect?
+        if let line = SpellingIndicator.line(at: target.location, element: element),
+           let range = SpellingIndicator.lineRange(for: line, element: element), range.length > 0 {
+            var last = range.location + range.length - 1
+            // A trailing line break has no visible rectangle: use the character before it.
+            if let trailing = AccessibilityText.substring(element, range: CFRange(location: last, length: 1)), trailing == "\n" || trailing == "\r" { last -= 1 }
+            if last >= target.location, let rect = SpellingIndicator.bounds(for: CFRange(location: last, length: 1), element: element),
+               CorrectionPopup.isValid(rect), abs(rect.midY - word.midY) <= max(rect.height, word.height) * 0.6 {
+                lineEnd = rect
+            }
+        }
+        var caret: CGRect?
+        if let selected = AccessibilityText.range(element), selected.length == 0, selected.location > 0 {
+            caret = SpellingIndicator.bounds(for: CFRange(location: selected.location - 1, length: 1), element: element)
+        }
+        return CorrectionPopup.Geometry(word: word, lineEnd: lineEnd, caret: caret, visible: SpellingIndicator.visibleArea(of: element))
     }
 
     private func candidate(in text: String, atFieldStart: Bool = false) -> CorrectionCandidate? {
@@ -744,6 +972,11 @@ final class CorrectionEngine {
     }
 
     private func spellingAssessment(_ word: String, context: String?, range: NSRange?) -> Assessment {
+        // A native transposition alone cannot choose between a purchase and a deadline.
+        // Keep the typo available for the following-context pass instead of committing early.
+        if preferences.language.lowercased().hasPrefix("en"), ContextualWritingRules.needsFollowingContext(word) {
+            return Assessment(misspelled: true, replacement: nil, automatic: false)
+        }
         if let writing = EnglishWritingRules.replacement(for: word, language: preferences.language) {
             return Assessment(misspelled: true, replacement: writing, automatic: true)
         }
@@ -981,6 +1214,7 @@ final class CorrectionEngine {
     }
 
     func undo(andIgnore: Bool = false) {
+        pendingDeletionRestart = false
         guard !inFlight, let saved = undoProposal, let anchor = undoAnchor else { return }
         resetTyping()
         var fresh: AccessibilityText.Snapshot?

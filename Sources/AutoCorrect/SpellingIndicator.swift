@@ -133,7 +133,7 @@ final class SpellingIndicator {
         return window
     }
 
-    private static func bounds(for range: CFRange, element: AXUIElement) -> CGRect? {
+    static func bounds(for range: CFRange, element: AXUIElement) -> CGRect? {
         var range = range
         guard let input = AXValueCreate(.cfRange, &range) else { return nil }
         var output: CFTypeRef?
@@ -145,16 +145,27 @@ final class SpellingIndicator {
         return result
     }
 
-    private static func line(at index: Int, element: AXUIElement) -> Int? {
+    static func line(at index: Int, element: AXUIElement) -> Int? {
         var output: CFTypeRef?
         guard AXUIElementCopyParameterizedAttributeValue(element, kAXLineForIndexParameterizedAttribute as CFString,
             NSNumber(value: index), &output) == .success, let number = output as? NSNumber else { return nil }
         return number.intValue
     }
 
+    /// The character range of a line, from AXRangeForLine.
+    static func lineRange(for line: Int, element: AXUIElement) -> CFRange? {
+        var output: CFTypeRef?
+        guard AXUIElementCopyParameterizedAttributeValue(element, kAXRangeForLineParameterizedAttribute as CFString,
+            NSNumber(value: line), &output) == .success, let value = output, CFGetTypeID(value) == AXValueGetTypeID(),
+              AXValueGetType(value as! AXValue) == .cfRange else { return nil }
+        var range = CFRange()
+        guard AXValueGetValue(value as! AXValue, .cfRange, &range), range.location >= 0, range.length >= 0 else { return nil }
+        return range
+    }
+
     /// The editor's visible area: the enclosing scroll area (if any) intersected with its
     /// window, both from AXFrame in Quartz coordinates. Nil when neither can be read.
-    private static func visibleArea(of element: AXUIElement) -> CGRect? {
+    static func visibleArea(of element: AXUIElement) -> CGRect? {
         var area: CGRect?
         var current: AXUIElement? = element
         for _ in 0..<12 {

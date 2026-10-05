@@ -108,6 +108,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(.separator())
         item("Show Spelling Underlines", action: #selector(toggleUnderlines), checked: preferences.showsSpellingIndicators)
         if preferences.showsSpellingIndicators { item(engine.underlineStatus) }
+        item("Show Undo Popup Beside Corrections", action: #selector(togglePopup), checked: preferences.showsCorrectionPopup)
+        if preferences.showsCorrectionPopup {
+            item(engine.popupStatus)
+            if engine.undoRecordID != nil {
+                let reopen = item("Review Latest Correction", action: #selector(showPopup))
+                reopen.keyEquivalent = "/"
+                reopen.keyEquivalentModifierMask = [.control, .option, .command]
+            }
+        }
         if let app = NSWorkspace.shared.frontmostApplication, let bundleID = app.bundleIdentifier, bundleID != Bundle.main.bundleIdentifier {
             let paused = preferences.excludedApps.contains(bundleID)
             let entry = item("\(paused ? "Resume" : "Pause") in \(app.localizedName ?? "This App")", action: #selector(toggleApp(_:)))
@@ -159,6 +168,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         settings?.present()
     }
     @objc private func toggleUnderlines() { preferences.showsSpellingIndicators.toggle(); engine.refresh() }
+    @objc private func togglePopup() { preferences.showsCorrectionPopup.toggle(); engine.popupSettingChanged() }
+    @objc private func showPopup() { engine.showPopupForLatestCorrection() }
     @objc private func toggleEnabled() { preferences.enabled.toggle(); engine.refresh() }
     @objc private func toggleApproval() { preferences.asksBeforeCorrecting.toggle(); engine.refresh() }
     @objc private func approve() { engine.approve() }

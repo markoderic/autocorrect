@@ -150,7 +150,7 @@ final class SettingsController: NSWindowController, NSTableViewDataSource, NSTab
         previewResult.font = .systemFont(ofSize: 13); previewResult.textColor = .secondaryLabelColor
         body.addArrangedSubview(card([label("Try it here", weight: .semibold), label("Preview a correction locally, without changing another app.", size: 12, secondary: true), previewField, previewResult]))
         updatePreview()
-        body.addArrangedSubview(label("Undo a correction with ⌃⌥⌘Z or from the menu bar.\nSpelling language: \(Locale.current.localizedString(forIdentifier: preferences.language) ?? preferences.language)", size: 12, secondary: true))
+        body.addArrangedSubview(label("Undo a correction with ⌃⌥⌘Z, from the popup beside the word, or from the menu bar. ⌃⌥⌘/ reopens the popup.\nSpelling language: \(Locale.current.localizedString(forIdentifier: preferences.language) ?? preferences.language)", size: 12, secondary: true))
     }
 
     private func writing(_ body: NSStackView) {
@@ -165,15 +165,17 @@ final class SettingsController: NSWindowController, NSTableViewDataSource, NSTab
             toggle("Ask before correcting", value: preferences.asksBeforeCorrecting, action: #selector(setApproval(_:))),
             label("Off: clear corrections apply automatically; uncertain words are only underlined. On: review suggestions in the menu bar.", size: 12, secondary: true),
             toggle("Check surrounding context", value: preferences.checksContext, action: #selector(setContext(_:))),
-            label("Fix clear its/it’s and lets/let’s contexts after nearby words are complete. Uncertain changes are only underlined in automatic mode.", size: 12, secondary: true)
+            label("Fix clear its/it’s, lets/let’s, and ambiguous byu contexts after nearby words are complete. Uncertain changes are only underlined in automatic mode.", size: 12, secondary: true)
         ]))
         body.addArrangedSubview(card([
             toggle("Fix missing spaces", value: preferences.separatesJoinedWords, action: #selector(setJoinedWords(_:))),
             label("Separate clear two-word combinations such as iknow and thankyou.", size: 12, secondary: true),
             toggle("Capitalize sentence starts", value: preferences.capitalizesAfterPeriod, action: #selector(setCapitals(_:))),
-            label("Capitalizes the first letter you type in an empty text area and the word after . ? ! once it is complete. Deliberately retyping a lowercase letter keeps it.", size: 12, secondary: true),
+            label("Capitalizes the first letter you type in an empty text area and the word after . ? ! once it is complete. Undo keeps your preferred casing; deleting the whole first attempt starts fresh.", size: 12, secondary: true),
             toggle("Show spelling underlines", value: preferences.showsSpellingIndicators, action: #selector(setUnderlines(_:))),
-            label("Marks the latest possible misspelling where the editor exposes its position. Other apps’ spelling settings stay unchanged.", size: 12, secondary: true)
+            label("Marks the latest possible misspelling where the editor exposes its position. Other apps’ spelling settings stay unchanged.", size: 12, secondary: true),
+            toggle("Show Undo popup beside corrections", value: preferences.showsCorrectionPopup, action: #selector(setPopup(_:))),
+            label("After a correction, a small dot appears at the end of that line. Click it or press ⌃⌥⌘/ to see what changed, with an Undo button beside the word; ⌃⌥⌘Z still undoes the latest correction. Hidden where the editor does not expose word positions.", size: 12, secondary: true)
         ]))
         body.addArrangedSubview(label("Changes save automatically. AutoCorrect leaves passwords and unsupported text fields alone.", size: 12, secondary: true))
     }
@@ -329,6 +331,7 @@ final class SettingsController: NSWindowController, NSTableViewDataSource, NSTab
     @objc private func setCapitals(_ sender: NSButton) { preferences.capitalizesAfterPeriod = sender.state == .on; changed() }
     @objc private func setJoinedWords(_ sender: NSButton) { preferences.separatesJoinedWords = sender.state == .on; changed() }
     @objc private func setUnderlines(_ sender: NSButton) { preferences.showsSpellingIndicators = sender.state == .on; changed() }
+    @objc private func setPopup(_ sender: NSButton) { preferences.showsCorrectionPopup = sender.state == .on; changed() }
     @objc private func setAbbreviations(_ sender: NSButton) { preferences.expandsAbbreviations = sender.state == .on; changed() }
     @objc private func setProducts(_ sender: NSButton) { preferences.normalizesProductNames = sender.state == .on; changed() }
     @objc private func setLanguage(_ sender: NSPopUpButton) { preferences.language = sender.selectedItem?.representedObject as? String ?? "en_US"; changed() }

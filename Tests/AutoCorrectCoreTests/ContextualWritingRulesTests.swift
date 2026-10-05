@@ -2,6 +2,23 @@ import XCTest
 @testable import AutoCorrectCore
 
 final class ContextualWritingRulesTests: XCTestCase {
+    func testAmbiguousTypoUsesCompletedDeadlineOrPurchaseContext() {
+        for text in ["lets do that byu this date ", "Let's finish it byu the deadline ",
+                     "Let’s send them byu that time ", "please review this byu this evening "] {
+            XCTAssertEqual(ContextualWritingRules.candidate(in: text)?.replacement, "by", text)
+        }
+        for text in ["I want to byu a book ", "we need to byu some food ", "going to byu this phone "] {
+            XCTAssertEqual(ContextualWritingRules.candidate(in: text)?.replacement, "buy", text)
+        }
+        for text in ["do that byu ", "do that byu this ", "do that byu this dat", "byu this date ",
+                     "do that buy this date ", "we buy this book ", "I want to byu this date ",
+                     "I want to byu a ", "study at BYU this year ", "do that byu this book ",
+                     "do that byu.this date ", "`do that byu this date ", "path/do that byu this date ",
+                     "she lets go ", "the app lets users type "] {
+            XCTAssertNil(ContextualWritingRules.candidate(in: text), text)
+        }
+    }
+
     func testContractionContextsAfterOneToThreeCompletedWords() throws {
         for text in ["its a ", "its an example ", "its a good day ", "its been ", "its not ready ", "its going to ", "its going to work "] {
             let candidate = try XCTUnwrap(ContextualWritingRules.candidate(in: text), text)

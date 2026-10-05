@@ -151,10 +151,10 @@ enum AccessibilityText {
     /// after the last paragraph. A window offset of zero alone proves nothing: editors that
     /// report offsets relative to a paragraph, or a caret far into a document, fail here.
     /// Costs one or two Accessibility reads; call it only after the text already looks like
-    /// a field start.
-    static func confirmsFieldStart(_ snapshot: Snapshot) -> Bool {
+    /// a field start. Deletion-restart checks also allow single-line inputs; capitalization does not.
+    static func confirmsFieldStart(_ snapshot: Snapshot, requireTextArea: Bool = true) -> Bool {
         guard snapshot.windowStart == 0, snapshot.caret == snapshot.text.utf16.count, snapshot.caret <= 64,
-              snapshot.isTextArea else { return false }
+              (!requireTextArea || snapshot.isTextArea) else { return false }
         if let count = (attribute(snapshot.element, kAXNumberOfCharactersAttribute) as? NSNumber)?.intValue {
             guard count >= snapshot.caret, count <= snapshot.caret + 1 else { return false }
             if count == snapshot.caret + 1 {
