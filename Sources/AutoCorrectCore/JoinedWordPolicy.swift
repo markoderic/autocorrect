@@ -13,7 +13,8 @@ public enum JoinedWordPolicy {
         "still", "too", "very", "one", "good", "how", "what", "when", "where", "who", "why", "and",
         "but", "or", "if", "is", "are", "was", "were", "be", "been", "can", "will", "would", "could",
         "should", "may", "might", "must", "do", "did", "does", "have", "has", "had",
-        "please", "thank", "hello", "hi", "hey", "let", "get", "go", "come", "make", "take"
+        "please", "thank", "hello", "hi", "hey", "let", "get", "go", "come", "make", "take",
+        "right"
     ]
     private static let firstPersonVerbs: Set<String> = [
         "know", "think", "want", "need", "like", "love", "hope", "wish", "have",

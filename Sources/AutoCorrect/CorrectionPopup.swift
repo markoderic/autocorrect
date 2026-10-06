@@ -7,10 +7,14 @@ import ApplicationServices
 /// draws without trustworthy single-line Accessibility geometry, and every control is bound to
 /// the immutable identity of the one correction it was built for.
 final class CorrectionPopup {
+    enum Kind: Equatable { case correction, suggestion }
     struct Content: Equatable {
         let id: UUID
         let original: String
         let replacement: String
+        var kind: Kind = .correction
+        /// A brief explanation shown with a suggestion.
+        var detail: String? = nil
     }
     enum Mode: Equatable { case capsule, dot }
 
@@ -207,8 +211,11 @@ final class CorrectionPopup {
                     }
                 }
                 if mode == .capsule, changed {
+                    let announcement = content.kind == .suggestion
+                        ? "AutoCorrect suggests changing \(content.original) to \(content.replacement). Apply or dismiss."
+                        : "AutoCorrect changed \(content.original) to \(content.replacement). Undo is available."
                     NSAccessibility.post(element: NSApp as Any, notification: .announcementRequested,
-                                         userInfo: [.announcement: "AutoCorrect changed \(content.original) to \(content.replacement). Undo is available.",
+                                         userInfo: [.announcement: announcement,
                                                     .priority: NSAccessibilityPriorityLevel.medium.rawValue])
                 }
             } else {
@@ -318,14 +325,20 @@ private final class CapsuleView: NSView {
             .strikethroughStyle: NSUnderlineStyle.single.rawValue])
         text.append(NSAttributedString(string: "  →  ", attributes: [.font: NSFont.systemFont(ofSize: 12), .foregroundColor: NSColor.tertiaryLabelColor]))
         text.append(NSAttributedString(string: content.replacement, attributes: [.font: NSFont.systemFont(ofSize: 12, weight: .semibold), .foregroundColor: NSColor.labelColor]))
+        if let detail = content.detail, !detail.isEmpty {
+            text.append(NSAttributedString(string: "   " + detail, attributes: [.font: NSFont.systemFont(ofSize: 11), .foregroundColor: NSColor.secondaryLabelColor]))
+        }
         let label = NSTextField(labelWithAttributedString: text)
-        label.setAccessibilityLabel("Changed \(content.original) to \(content.replacement)")
-        let undo = NSButton(title: "Undo", target: self, action: #selector(undoClicked))
+        let isSuggestion = content.kind == .suggestion
+        label.setAccessibilityLabel(isSuggestion ? "Suggestion: change \(content.original) to \(content.replacement). \(content.detail ?? "")"
+                                                 : "Changed \(content.original) to \(content.replacement)")
+        let undo = NSButton(title: isSuggestion ? "Apply" : "Undo", target: self, action: #selector(undoClicked))
         undo.bezelStyle = .accessoryBarAction
         undo.controlSize = .small
         undo.font = .systemFont(ofSize: 11, weight: .medium)
-        undo.setAccessibilityLabel("Undo correction of \(content.original) to \(content.replacement)")
-        undo.setAccessibilityHelp("Also available with Control-Option-Command-Z")
+        undo.setAccessibilityLabel(isSuggestion ? "Apply suggestion: \(content.original) to \(content.replacement)"
+                                                : "Undo correction of \(content.original) to \(content.replacement)")
+        undo.setAccessibilityHelp(isSuggestion ? "Also available from the AutoCorrect menu" : "Also available with Control-Option-Command-Z")
         let close = NSButton(image: NSImage(systemSymbolName: "xmark.circle.fill", accessibilityDescription: "Dismiss")!, target: self, action: #selector(dismissClicked))
         close.isBordered = false
         close.contentTintColor = .tertiaryLabelColor
@@ -344,7 +357,8 @@ private final class CapsuleView: NSView {
             stack.centerYAnchor.constraint(equalTo: centerYAnchor)])
         setAccessibilityElement(true)
         setAccessibilityRole(.group)
-        setAccessibilityLabel("AutoCorrect changed \(content.original) to \(content.replacement)")
+        setAccessibilityLabel(content.kind == .suggestion ? "AutoCorrect suggests changing \(content.original) to \(content.replacement)"
+                                                          : "AutoCorrect changed \(content.original) to \(content.replacement)")
     }
     required init?(coder: NSCoder) { nil }
 
@@ -372,8 +386,9 @@ private final class DotView: NSView {
         super.init(frame: .zero)
         setAccessibilityElement(true)
         setAccessibilityRole(.button)
-        setAccessibilityLabel("Recent correction: \(content.original) changed to \(content.replacement). Click to review or undo.")
-        toolTip = "\(content.original) → \(content.replacement). Click to review, or press Control-Option-Command-/"
+        setAccessibilityLabel(content.kind == .suggestion ? "Suggestion: \(content.original) could be \(content.replacement). Click to review."
+                                                          : "Recent correction: \(content.original) changed to \(content.replacement). Click to review or undo.")
+        toolTip = "\(content.original) → \(content.replacement). Click to review" + (content.kind == .suggestion ? "" : ", or press Control-Option-Command-/")
     }
     required init?(coder: NSCoder) { nil }
     override var isOpaque: Bool { false }

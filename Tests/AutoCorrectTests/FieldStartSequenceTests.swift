@@ -472,3 +472,107 @@ final class FieldStartSequenceTests: XCTestCase {
         XCTAssertNil(engine.pending)
     }
 }
+
+// MARK: - Owner-reported fundamentals (independent review, October 5, 2026)
+extension FieldStartSequenceTests {
+    func testReviewPartialBackspaceBeforeFirstBoundary() {
+        type("tex")
+        XCTAssertEqual(host.text, "Tex")
+        engine.debugDeleteKey(); host.text.removeLast()
+        type("h ")
+        XCTAssertEqual(host.text, "The ", "editing an unfinished word is not rejecting a spelling correction")
+    }
+
+    func testReviewReportedBasicWords() {
+        for (input, expected) in [("claude is done ", "Claude is done "), ("tuesday ", "Tuesday "), ("Rightnow ", "Right now ")] {
+            engine.invalidate(); host.text = ""
+            type(input)
+            XCTAssertEqual(host.text, expected, input)
+        }
+    }
+
+    func testReviewBasicWordControls() {
+        for (input, expected) in [("teh ", "The "), ("We meet tuesday ", "We meet Tuesday "), ("Use claude ", "Use Claude "), ("rightnow ", "Right now ")] {
+            engine.invalidate(); host.text = ""
+            type(input)
+            XCTAssertEqual(host.text, expected, input)
+        }
+    }
+
+    func testReviewBackspaceWithoutEarlyCapital() {
+        preferences.capitalizesAfterPeriod = false
+        type("tex")
+        engine.debugDeleteKey(); host.text.removeLast()
+        type("h ")
+        XCTAssertEqual(host.text, "the ")
+    }
+}
+
+// MARK: - Unfinished-word editing coverage (repair pass, October 5, 2026)
+extension FieldStartSequenceTests {
+    func testRepeatedBackspacesAndMistakesBeforeTheFirstSpace() {
+        type("tex")
+        XCTAssertEqual(host.text, "Tex")
+        engine.debugDeleteKey(); host.text.removeLast()
+        type("j")
+        engine.debugDeleteKey(); host.text.removeLast()
+        engine.debugDeleteKey(); host.text.removeLast()
+        XCTAssertEqual(host.text, "T")
+        type("eh ")
+        XCTAssertEqual(host.text, "The ", "several corrections while the first word is unfinished are still just typing")
+    }
+
+    func testFastRetypeAfterBackspaceBeforeTheFirstSpace() {
+        type("tex")
+        engine.debugDeleteKey(); host.text.removeLast()
+        typeFast("h next ")
+        XCTAssertEqual(host.text, "The next ")
+    }
+
+    func testBackspaceInsideALaterWordKeepsSpellingCorrection() {
+        type("Ok tx")
+        engine.debugDeleteKey(); host.text.removeLast()
+        type("eh ")
+        XCTAssertEqual(host.text, "Ok the ")
+    }
+
+    func testDeliberateReversalOfARealSpellingCorrectionIsStillRespected() {
+        type("I teh ")
+        XCTAssertEqual(host.text, "I the ")
+        host.text = "I "
+        engine.debugDeleteKey()
+        type("teh ")
+        XCTAssertEqual(host.text, "I teh ", "retyping the same misspelling at the same place after a real correction is a deliberate choice")
+    }
+
+    func testIgnoredWordAfterPartialBackspaceStaysAsTyped() {
+        preferences.ignoredWords = ["teh"]
+        type("tex")
+        engine.debugDeleteKey(); host.text.removeLast()
+        type("h ")
+        XCTAssertEqual(host.text, "Teh ")
+    }
+
+    func testCompleteFieldRestartAfterCapitalCorrectsTheNewWord() {
+        type("tex")
+        XCTAssertEqual(host.text, "Tex")
+        host.text = ""
+        engine.debugDeleteKey(); engine.debugDeleteKey(); engine.debugDeleteKey()
+        type("teh ")
+        XCTAssertEqual(host.text, "The ")
+    }
+
+    func testCasingFamiliesAndNegativeControls() {
+        for (input, expected) in [("We meet tuesday ", "We meet Tuesday "), ("Due in january ", "Due in January "), ("Use claude ", "Use Claude "),
+                                  ("Ask openai ", "Ask OpenAI "), ("rightnow ", "Right now "), ("Do it rightnow ", "Do it right now ")] {
+            engine.invalidate(); host.text = ""
+            type(input)
+            XCTAssertEqual(host.text, expected, input)
+        }
+        for sentence in ["I may go ", "The march was long ", "It was august ", "A sunny day ", "Right now ", "Claude is here ", "The rightmost column ", "Tuesdays are long "] {
+            engine.invalidate(); host.text = ""
+            type(sentence)
+            XCTAssertEqual(host.text, sentence, sentence)
+        }
+    }
+}

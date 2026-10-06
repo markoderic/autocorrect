@@ -27,6 +27,8 @@ final class SettingsController: NSWindowController, NSTableViewDataSource, NSTab
     private let wordField = NSTextField()
     private let previewField = NSTextField()
     private let previewResult = NSTextField(wrappingLabelWithString: "Type a word or short sentence ending in a space.")
+    var sentenceAvailability: (() -> String)?
+    var sentenceSettingsChanged: (() -> Void)?
     private let liveStatus = NSTextField(wrappingLabelWithString: "")
     private let message = NSTextField(wrappingLabelWithString: "")
     private var filterBuiltins = false
@@ -176,6 +178,13 @@ final class SettingsController: NSWindowController, NSTableViewDataSource, NSTab
             label("Marks the latest possible misspelling where the editor exposes its position. Other apps’ spelling settings stay unchanged.", size: 12, secondary: true),
             toggle("Show Undo popup beside corrections", value: preferences.showsCorrectionPopup, action: #selector(setPopup(_:))),
             label("After a correction, a small dot appears at the end of that line. Click it or press ⌃⌥⌘/ to see what changed, with an Undo button beside the word; ⌃⌥⌘Z still undoes the latest correction. Hidden where the editor does not expose word positions.", size: 12, secondary: true)
+        ]))
+        body.addArrangedSubview(card([
+            label("Sentence suggestions", weight: .semibold),
+            toggle("Suggest grammar fixes", value: preferences.grammarSuggestions, action: #selector(setGrammar(_:))),
+            toggle("Suggest punctuation fixes", value: preferences.punctuationSuggestions, action: #selector(setPunctuation(_:))),
+            label("After you finish a sentence, AutoCorrect reviews it on this Mac and offers a suggestion with an explanation, Apply and Dismiss, beside the sentence or from the menu bar. Suggestions never change text on their own. Names, numbers, negations, links and code are left alone.", size: 12, secondary: true),
+            label(sentenceAvailability?() ?? "", size: 12, secondary: true)
         ]))
         body.addArrangedSubview(label("Changes save automatically. AutoCorrect leaves passwords and unsupported text fields alone.", size: 12, secondary: true))
     }
@@ -332,6 +341,8 @@ final class SettingsController: NSWindowController, NSTableViewDataSource, NSTab
     @objc private func setJoinedWords(_ sender: NSButton) { preferences.separatesJoinedWords = sender.state == .on; changed() }
     @objc private func setUnderlines(_ sender: NSButton) { preferences.showsSpellingIndicators = sender.state == .on; changed() }
     @objc private func setPopup(_ sender: NSButton) { preferences.showsCorrectionPopup = sender.state == .on; changed() }
+    @objc private func setGrammar(_ sender: NSButton) { preferences.grammarSuggestions = sender.state == .on; sentenceSettingsChanged?(); changed() }
+    @objc private func setPunctuation(_ sender: NSButton) { preferences.punctuationSuggestions = sender.state == .on; sentenceSettingsChanged?(); changed() }
     @objc private func setAbbreviations(_ sender: NSButton) { preferences.expandsAbbreviations = sender.state == .on; changed() }
     @objc private func setProducts(_ sender: NSButton) { preferences.normalizesProductNames = sender.state == .on; changed() }
     @objc private func setLanguage(_ sender: NSPopUpButton) { preferences.language = sender.selectedItem?.representedObject as? String ?? "en_US"; changed() }

@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
-VERSION="${VERSION:-0.3.11}"
+VERSION="${VERSION:-0.3.12}"
 SIGNING_IDENTITY="${SIGNING_IDENTITY:--}"
 # DIST_DIR lets a development build land somewhere other than dist/ so it cannot
 # replace a recorded archive there (e.g. DIST_DIR="$PWD/dist/dev"). Default unchanged.

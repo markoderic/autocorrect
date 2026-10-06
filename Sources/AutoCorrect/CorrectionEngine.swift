@@ -46,6 +46,13 @@ final class CorrectionEngine {
     private var popupMode: CorrectionPopup.Mode = .dot
     private var popupDismissedID: UUID?
     private(set) var popupStatus = "Popup: none"
+    /// Sentence-level grammar and punctuation suggestions (Suggest only; never automatic).
+    let sentences: SentenceAssistant
+    private var suggestionPopup = CorrectionPopup()
+    private var suggestionPopupMode: CorrectionPopup.Mode = .capsule
+    private(set) var suggestionPopupStatus = ""
+    var activeSuggestion: SentenceSuggestion? { sentences.active?.suggestion }
+    var sentenceStatus: String { sentences.status }
     private var attemptedBoundaries: [UInt64: Int] = [:]
     private var manualRewrites = ManualRewriteProtection()
     // A deletion may empty the editor. The next typing snapshot must prove a new field
@@ -93,9 +100,16 @@ final class CorrectionEngine {
     var undoContextReader: ((NSRange) -> String?)?
     var popupFieldFocused: (() -> Bool)?
     var debugPopup: CorrectionPopup { popup }
+    var sentenceContextReader: ((NSRange) -> String?)?
+    var debugSuggestionPopup: CorrectionPopup { suggestionPopup }
+    func debugRenderSuggestion() { renderSuggestion() }
+    /// Test hook: analyze the last complete sentence of this snapshot now, even if it was analyzed before.
+    func debugReanalyze(using snapshot: AccessibilityText.Snapshot) { sentences.debugForgetLastAnalyzed(); sentences.consider(snapshot: snapshot, reason: "test") }
     func debugInstallHeadlessPopup() {
         popup = CorrectionPopup(makesWindows: false)
         wirePopup()
+        suggestionPopup = CorrectionPopup(makesWindows: false)
+        wireSuggestionPopup()
     }
     func debugRenderPopup() { renderPopup() }
     /// Test hook: ages the current undo record so expiry can be exercised without waiting.
@@ -109,6 +123,8 @@ final class CorrectionEngine {
     var snapshotProvider: (() -> AccessibilityText.Snapshot?)?
     /// Test hook: what a Backspace or navigation key does to the typing session.
     func debugDeleteKey() { key(nil, flags: [], keyCode: 51) }
+    /// Test hook: an arbitrary key (Return, arrows) exactly as the event tap reports it.
+    func debugTypeKey(_ text: String?, keyCode: Int64) { key(text, flags: [], keyCode: keyCode) }
     func debugNoteManualEdit() {
         manualRewrites.noteManualEdit(now: ProcessInfo.processInfo.systemUptime)
         resetTyping()
@@ -124,8 +140,16 @@ final class CorrectionEngine {
     private let monitor = KeyboardMonitor()
     var isRunning: Bool { monitor.isRunning }
 
-    init(preferences: Preferences) {
+    init(preferences: Preferences, analyzer: SentenceAnalyzer? = nil) {
         self.preferences = preferences
+        sentences = SentenceAssistant(analyzer: analyzer ?? SentenceAnalyzers.preferred())
+        sentences.grammarEnabled = { preferences.grammarSuggestions }
+        sentences.punctuationEnabled = { preferences.punctuationSuggestions }
+        sentences.onChange = { [weak self] in self?.onChange?(); self?.scheduleRender(delay: 0) }
+        sentences.contextReader = { [weak self] field, range in self?.readSentenceContext(field: field, range: range) }
+        sentences.snapshotReader = { [weak self] _ in self?.analysisSnapshot() }
+        sentences.fieldFocused = { [weak self] field in self?.isFieldFocused(field) ?? false }
+        sentences.isSpanProtected = { [weak self] _, location, original in self?.isSuggestionSpanProtected(location: location, original: original) ?? true }
         monitor.onKey = { [weak self] text, flags, key in self?.key(text, flags: flags, keyCode: key) }
         monitor.onMouse = { [weak self] type, location in self?.handleMouse(type: type, location: location) }
         monitor.onUndo = { [weak self] in
@@ -139,6 +163,138 @@ final class CorrectionEngine {
             return true
         }
         wirePopup()
+        wireSuggestionPopup()
+    }
+
+    /// Bounded read of a field at an absolute range, for sentence verification (test seam first).
+    private func readSentenceContext(field: SentenceAssistant.Field, range: NSRange) -> String? {
+        #if DEBUG
+        if let sentenceContextReader { return sentenceContextReader(range) }
+        #endif
+        return AccessibilityText.substring(field.element, range: CFRange(location: range.location, length: range.length))
+    }
+
+    private func isFieldFocused(_ field: SentenceAssistant.Field) -> Bool {
+        #if DEBUG
+        if let popupFieldFocused { return popupFieldFocused() }
+        #endif
+        guard NSWorkspace.shared.frontmostApplication?.processIdentifier == field.pid,
+              let current = AccessibilityText.focusedElement(pid: field.pid) else { return false }
+        return CFEqual(current, field.element)
+    }
+
+    /// Ignored words and occurrences the user deliberately kept are never proposed for change.
+    private func isSuggestionSpanProtected(location: Int, original: String) -> Bool {
+        let words = original.split(whereSeparator: { !$0.isLetter && $0 != "'" && $0 != "’" }).map { UserDictionary.normalizedKey(String($0)) }
+        if words.contains(where: { preferences.ignoredWords.contains($0) }) { return true }
+        if overridden.marks.contains(where: { $0.location >= location && $0.location < location + original.utf16.count }) { return true }
+        return false
+    }
+
+    private func wireSuggestionPopup() {
+        suggestionPopup.onUndo = { [weak self] id in self?.applySuggestion(id: id) }
+        suggestionPopup.onDismiss = { [weak self] id in self?.dismissSuggestion(id: id) }
+        suggestionPopup.onExpand = { [weak self] id in
+            guard let self, self.activeSuggestion?.id == id else { return }
+            self.suggestionPopupMode = .capsule
+            self.renderSuggestion()
+        }
+        suggestionPopup.onCollapsed = { [weak self] id in
+            guard let self, self.activeSuggestion?.id == id else { return }
+            self.suggestionPopupMode = .dot
+            self.renderSuggestion()
+        }
+    }
+
+    /// A bounded snapshot for sentence analysis after a typing pause: the test seam, or the
+    /// focused field of the frontmost, non-excluded app. Nil when nothing can be read.
+    private func analysisSnapshot() -> AccessibilityText.Snapshot? {
+        #if DEBUG
+        if let snapshotProvider { return snapshotProvider() }
+        #endif
+        guard preferences.enabled, AXIsProcessTrusted(), !inFlight,
+              let app = NSWorkspace.shared.frontmostApplication,
+              app.processIdentifier != ProcessInfo.processInfo.processIdentifier,
+              let bundleID = app.bundleIdentifier, !preferences.excludedApps.contains(bundleID) else { return nil }
+        return AccessibilityText.snapshot(pid: app.processIdentifier)
+    }
+
+    /// Applies the active suggestion through the same guarded keyboard transport as every
+    /// correction, after re-reading the field and confirming the exact analyzed sentence and span.
+    func applySuggestion(id: UUID) {
+        guard let current = sentences.active, current.suggestion.id == id else {
+            RuntimeDiagnostics.record("suggestion: stale apply refused")
+            status = "That suggestion is no longer current; nothing changed"
+            onChange?()
+            return
+        }
+        guard !inFlight else { status = "Busy with another edit; try again"; onChange?(); return }
+        guard sentences.revalidate() else {
+            status = "Suggestion unavailable: its full context could not be verified"
+            suggestionPopup.hide()
+            onChange?()
+            return
+        }
+        var fresh: AccessibilityText.Snapshot?
+        #if DEBUG
+        if let snapshotProvider { fresh = snapshotProvider() }
+        #endif
+        if fresh == nil, NSWorkspace.shared.frontmostApplication?.processIdentifier == current.field.pid {
+            fresh = AccessibilityText.snapshot(pid: current.field.pid)
+        }
+        guard let snapshot = fresh, snapshot.pid == current.field.pid, CFEqual(snapshot.element, current.field.element) else {
+            status = "Suggestion unavailable: return to the field it was made for"
+            onChange?()
+            return
+        }
+        let ns = snapshot.text as NSString
+        let sentenceLocal = current.sentenceLocation - snapshot.windowStart
+        let sentenceLength = current.suggestion.sentence.utf16.count
+        guard sentenceLocal >= 0, sentenceLocal + sentenceLength <= ns.length,
+              ns.substring(with: NSRange(location: sentenceLocal, length: sentenceLength)) == current.suggestion.sentence else {
+            sentences.withdraw(reason: "sentence changed")
+            suggestionPopup.clear()
+            status = "Suggestion withdrawn: the sentence changed"
+            onChange?()
+            return
+        }
+        let span = NSRange(location: sentenceLocal + current.suggestion.range.location, length: current.suggestion.range.length)
+        guard ns.substring(with: span) == current.suggestion.original else {
+            sentences.withdraw(reason: "span changed")
+            suggestionPopup.clear()
+            onChange?()
+            return
+        }
+        guard sentences.applyStarted(id: id) != nil else { return }
+        suggestionPopup.hide()
+        applyingSuggestionID = id
+        perform(Proposal(snapshot: snapshot, range: span, original: current.suggestion.original,
+                         replacement: current.suggestion.replacement, created: Date()), isUndo: false, andIgnore: false)
+    }
+
+    /// The id of the suggestion whose edit is in flight, so the transport's outcome reaches it.
+    private var applyingSuggestionID: UUID?
+
+    private func suggestionApplyFailed(_ reason: String) {
+        guard let id = applyingSuggestionID else { return }
+        applyingSuggestionID = nil
+        sentences.applyFailed(id: id, reason: reason)
+        scheduleRender(delay: 0)
+    }
+
+    func dismissSuggestion(id: UUID) {
+        guard sentences.dismiss(id: id) else { return }
+        suggestionPopup.clear()
+        suggestionPopupStatus = ""
+        onChange?()
+    }
+
+    /// Grammar or punctuation switches changed: drop current analysis and redraw.
+    func sentenceSettingsChanged() {
+        sentences.invalidate()
+        suggestionPopup.clear()
+        suggestionPopupStatus = ""
+        onChange?()
     }
 
     private func wirePopup() {
@@ -166,7 +322,7 @@ final class CorrectionEngine {
     /// Everything else (editor clicks, scrolling) invalidates typing state, hides the overlays
     /// and redraws them once the view settles.
     func handleMouse(type: CGEventType, location: CGPoint) {
-        if type != .scrollWheel, popup.contains(quartzPoint: location) {
+        if type != .scrollWheel, popup.contains(quartzPoint: location) || suggestionPopup.contains(quartzPoint: location) {
             RuntimeDiagnostics.record("mouse inside popup")
             return
         }
@@ -174,9 +330,11 @@ final class CorrectionEngine {
         manualRewrites.noteManualEdit(now: ProcessInfo.processInfo.systemUptime)
         resetTyping()
         indicator.hide()
-        // A click elsewhere or a scroll quiets the capsule to the indicator.
+        // A click elsewhere or a scroll quiets the capsules to their indicators.
         if popupMode == .capsule { popupMode = .dot }
         popup.hide()
+        if suggestionPopupMode == .capsule { suggestionPopupMode = .dot }
+        suggestionPopup.hide()
         // Clicks and scrolling move text under the marks; redraw once the view settles,
         // and scan the region that may have scrolled into view.
         scheduleRender(delay: 250)
@@ -251,6 +409,11 @@ final class CorrectionEngine {
         popupDismissedID = nil
         popup.clear()
         popupStatus = "Popup: none"
+        sentences.invalidate()
+        applyingSuggestionID = nil
+        suggestionPopup.clear()
+        suggestionPopupMode = .capsule
+        suggestionPopupStatus = ""
         autoCapital = nil
         backlog.reset()
         attemptedBoundaries.removeAll()
@@ -313,7 +476,11 @@ final class CorrectionEngine {
         indicator.hide()
         if popupMode == .capsule { popupMode = .dot }
         popup.hide()
+        if suggestionPopupMode == .capsule { suggestionPopupMode = .dot }
+        suggestionPopup.hide()
         if undoRecordID != nil, preferences.showsCorrectionPopup { scheduleRender(delay: 400) }
+        if sentences.active != nil { scheduleRender(delay: 400) }
+        if preferences.enabled { sentences.noteTyping { [weak self] in self?.analysisSnapshot() } }
         if hadProposal { status = "Ready"; onChange?() }
         if keyCode == 9, flags.contains(.maskCommand) { scheduleScan(delay: 600) }   // paste
         guard preferences.enabled, !flags.contains(.maskCommand), !flags.contains(.maskControl), !flags.contains(.maskAlternate),
@@ -432,6 +599,8 @@ final class CorrectionEngine {
             }
             backlog.remove(boundary.id)
         }
+        // Every boundary settled without an edit: the last complete sentence may be analyzed.
+        if preferences.enabled, !inFlight { sentences.noteBoundary(snapshot: snapshot) }
     }
 
     /// Count only newly typed keys after the deletion. If they cover the entire verified
@@ -554,10 +723,15 @@ final class CorrectionEngine {
         if isUndo {
             // The user asked for the original spelling back: keep that occurrence unmarked.
             noteOverride(SpellingMark(location: editLocation, word: proposal.replacement))
+            manualRewrites.noteExplicitRejection(field: rewriteFieldID(for: proposal.snapshot), location: editLocation)
+            sentences.noteUndo(spanLocation: editLocation, restoredText: proposal.replacement)
             autoCapital = nil
             undoRecordID = nil
             popup.clear()
             popupStatus = "Popup: none"
+        } else if let id = applyingSuggestionID {
+            applyingSuggestionID = nil
+            sentences.applySucceeded(id: id)
         } else if proposal.capitalizesFieldStart {
             // The field's first letter is now capitalized: no further reads this session,
             // and the completed token will be judged as typed.
@@ -800,7 +974,7 @@ final class CorrectionEngine {
     private func scheduleRender(delay: Int) {
         renderWork?.cancel()
         guard !suppressesRendering else { return }
-        let task = DispatchWorkItem { [weak self] in self?.renderMarks(); self?.renderPopup() }
+        let task = DispatchWorkItem { [weak self] in self?.renderMarks(); self?.renderPopup(); self?.renderSuggestion() }
         renderWork = task
         DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(delay), execute: task)
     }
@@ -875,6 +1049,39 @@ final class CorrectionEngine {
         report(shown ? (popupMode == .capsule ? "Popup: beside the word" : "Popup: indicator after the word's line")
                      : (popupMode == .capsule ? "Popup: no placement that avoids the caret or the screen edge"
                                               : "Popup: indicator has no safe place on this line"))
+    }
+
+    /// Draws the active suggestion (capsule with Apply and dismiss, or its indicator) beside the
+    /// suggested span. The sentence is re-read first; a changed sentence withdraws it. Missing
+    /// geometry hides the popup and points to the menu, never to a guessed position.
+    private func renderSuggestion() {
+        guard !suppressesRendering else { return }
+        func report(_ text: String) { if suggestionPopupStatus != text { suggestionPopupStatus = text; onChange?() } }
+        guard preferences.enabled, let current = sentences.active else { suggestionPopup.clear(); report(""); return }
+        var focused = NSWorkspace.shared.frontmostApplication?.processIdentifier == current.field.pid
+        if focused, let element = AccessibilityText.focusedElement(pid: current.field.pid) { focused = CFEqual(element, current.field.element) } else { focused = false }
+        #if DEBUG
+        if let popupFieldFocused { focused = popupFieldFocused() }
+        #endif
+        guard focused else { suggestionPopup.hide(); report("Suggestion popup: hidden until the field is focused again"); return }
+        let element = current.field.element
+        guard sentences.applying == nil else { suggestionPopup.hide(); report("Suggestion popup: applying"); return }
+        guard sentences.revalidate(), let live = sentences.active else {
+            suggestionPopup.hide(); report(sentences.active == nil ? "" : "Suggestion popup: hidden (text could not be verified)"); return
+        }
+        let span = NSRange(location: live.spanLocation, length: live.suggestion.original.utf16.count)
+        var geometry: CorrectionPopup.Geometry?
+        #if DEBUG
+        if let popupGeometryProvider { geometry = popupGeometryProvider(span) } else { geometry = popupGeometry(for: span, element: element) }
+        #else
+        geometry = popupGeometry(for: span, element: element)
+        #endif
+        guard let geometry else { suggestionPopup.hide(); report("Suggestion popup: word position unavailable here; review it from the menu"); return }
+        let content = CorrectionPopup.Content(id: live.suggestion.id, original: live.suggestion.original, replacement: live.suggestion.replacement,
+                                              kind: .suggestion, detail: live.suggestion.explanation)
+        let shown = suggestionPopup.show(content, mode: suggestionPopupMode, geometry: geometry)
+        report(shown ? (suggestionPopupMode == .capsule ? "Suggestion popup: beside the sentence" : "Suggestion popup: indicator after the line")
+                     : "Suggestion popup: no safe placement; review it from the menu")
     }
 
     /// Verified geometry for the corrected span from Accessibility: single-line word rectangle
@@ -1100,6 +1307,7 @@ final class CorrectionEngine {
             retireAutoCapital(for: proposal)
             if let boundaryID { backlog.remove(boundaryID); scheduleCheck() }
             status = "Text changed or field unsupported — skipped"
+            suggestionApplyFailed("the caret position does not allow a safe edit (the caret must be within about 96 plain characters after the span, with no selection); move the caret closer or edit by hand")
             onChange?()
             return
         }
@@ -1115,7 +1323,7 @@ final class CorrectionEngine {
             } else {
                 protectionID = manualRewrites.recordPostedCorrection(field: field, text: proposal.snapshot.text,
                     windowStart: proposal.snapshot.windowStart, range: proposal.range, replacement: proposal.replacement,
-                    now: ProcessInfo.processInfo.systemUptime)
+                    now: ProcessInfo.processInfo.systemUptime, caseOnly: proposal.capitalizesFieldStart)
             }
             let epoch = sessionEpoch
             editTransport(proposal, plan) { [weak self] observed in
@@ -1132,6 +1340,7 @@ final class CorrectionEngine {
                     self.backlog.reset()
                     if let protectionID { self.manualRewrites.remove(protectionID) }
                     self.status = "Editor did not confirm correction"
+                    self.suggestionApplyFailed("the editor did not confirm the edit")
                     return
                 }
                 if isUndo { self.undoProposal = nil; self.undoAnchor = nil }
@@ -1156,7 +1365,7 @@ final class CorrectionEngine {
             } else {
                 protectionID = self.manualRewrites.recordPostedCorrection(field: field, text: proposal.snapshot.text,
                     windowStart: proposal.snapshot.windowStart, range: proposal.range, replacement: proposal.replacement,
-                    now: ProcessInfo.processInfo.systemUptime)
+                    now: ProcessInfo.processInfo.systemUptime, caseOnly: proposal.capitalizesFieldStart)
             }
             return true
         }, completion: { [weak self] posted in
@@ -1188,6 +1397,7 @@ final class CorrectionEngine {
         } else {
             // Approval actions have no queued boundary to retry.
             retireAutoCapital(for: proposal)
+            suggestionApplyFailed("the edit was cancelled before it could be posted; try again")
         }
         scheduleCheck()
     }
@@ -1205,6 +1415,7 @@ final class CorrectionEngine {
                     if let protectionID { self.manualRewrites.remove(protectionID) }
                     RuntimeDiagnostics.record("correction unconfirmed")
                     self.status = "Editor did not confirm correction"
+                    self.suggestionApplyFailed("the editor did not confirm the edit")
                     self.onChange?()
                 }
                 return

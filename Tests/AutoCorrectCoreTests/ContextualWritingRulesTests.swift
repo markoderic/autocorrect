@@ -67,4 +67,26 @@ final class ContextualWritingRulesTests: XCTestCase {
         XCTAssertEqual(candidate.range, (text as NSString).range(of: "it’s"))
         XCTAssertEqual((text as NSString).replacingCharacters(in: candidate.range, with: candidate.replacement), "🙂 café: check its color ")
     }
+
+    /// Owner-reported misses (October 5, 2026): the invitation sat after a short run of
+    /// discourse words ("Ok then", "No") rather than after a single listed opener. The rule
+    /// looks back at most three completed words, so in live typing "No lets do it in claude"
+    /// is caught at the "do " boundary; the fixtures reflect that boundary.
+    func testInvitationAfterShortDiscourseRuns() throws {
+        for text in ["Ok then lets go ", "No lets do it ", "No lets do ", "Yes please lets start ",
+                     "Alright then lets try ", "ok, so lets begin ", "Oh no lets not go ", "Sure, lets see ", "No, lets all go "] {
+            let candidate = try XCTUnwrap(ContextualWritingRules.candidate(in: text), text)
+            XCTAssertEqual(candidate.original, "lets", text)
+            XCTAssertEqual(candidate.replacement, "let's", text)
+            XCTAssertTrue(candidate.automatic, text)
+        }
+    }
+
+    func testVerbUsesOfLetsStayWhenAnythingButDiscourseWordsPrecede() {
+        for text in ["The app lets users export ", "She then lets go of the rope ", "He lets me choose ", "No one lets him in ",
+                     "Then she lets go ", "Well he lets us ", "ok the app lets users go ", "No lets ", "No lets d",
+                     "no lets users go ", "Mom lets us go "] {
+            XCTAssertNil(ContextualWritingRules.candidate(in: text), text)
+        }
+    }
 }

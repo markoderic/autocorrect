@@ -108,6 +108,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(.separator())
         item("Show Spelling Underlines", action: #selector(toggleUnderlines), checked: preferences.showsSpellingIndicators)
         if preferences.showsSpellingIndicators { item(engine.underlineStatus) }
+        menu.addItem(.separator())
+        item("Grammar Suggestions", action: #selector(toggleGrammar), checked: preferences.grammarSuggestions)
+        item("Punctuation Suggestions", action: #selector(togglePunctuation), checked: preferences.punctuationSuggestions)
+        if preferences.grammarSuggestions || preferences.punctuationSuggestions {
+            item(engine.sentences.availabilityText)
+            if engine.sentences.revalidate(), let suggestion = engine.activeSuggestion {
+                item("Suggestion: \(suggestion.original) → \(suggestion.replacement)")
+                item(suggestion.explanation)
+                let apply = item("Apply Suggestion", action: #selector(applySuggestion))
+                apply.representedObject = suggestion.id.uuidString
+                let dismiss = item("Dismiss Suggestion", action: #selector(dismissSuggestion))
+                dismiss.representedObject = suggestion.id.uuidString
+                if !engine.suggestionPopupStatus.isEmpty { item(engine.suggestionPopupStatus) }
+            } else {
+                item(engine.sentenceStatus)
+            }
+        }
+        menu.addItem(.separator())
         item("Show Undo Popup Beside Corrections", action: #selector(togglePopup), checked: preferences.showsCorrectionPopup)
         if preferences.showsCorrectionPopup {
             item(engine.popupStatus)
@@ -159,6 +177,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let controller = SettingsController(preferences: preferences) { [weak self] in self?.engine.refresh() }
             controller.builtInReplacements = BuiltInReplacements.expansions.merging(BuiltInReplacements.casing) { _, product in product }
             controller.preview = { [weak self] in self?.engine.previewText(in: $0) }
+            controller.sentenceAvailability = { [weak self] in self?.engine.sentences.availabilityText ?? "" }
+            controller.sentenceSettingsChanged = { [weak self] in self?.engine.sentenceSettingsChanged() }
             controller.statusProvider = { [weak self] in
                 guard let self = self else { return "" }
                 return "\(self.engine.status) · \(self.engine.correctionCount) corrections this session"
@@ -169,6 +189,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
     @objc private func toggleUnderlines() { preferences.showsSpellingIndicators.toggle(); engine.refresh() }
     @objc private func togglePopup() { preferences.showsCorrectionPopup.toggle(); engine.popupSettingChanged() }
+    @objc private func toggleGrammar() { preferences.grammarSuggestions.toggle(); engine.sentenceSettingsChanged() }
+    @objc private func togglePunctuation() { preferences.punctuationSuggestions.toggle(); engine.sentenceSettingsChanged() }
+    @objc private func applySuggestion(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let id = UUID(uuidString: raw) else { return }
+        engine.applySuggestion(id: id)
+    }
+    @objc private func dismissSuggestion(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let id = UUID(uuidString: raw) else { return }
+        engine.dismissSuggestion(id: id)
+    }
     @objc private func showPopup() { engine.showPopupForLatestCorrection() }
     @objc private func toggleEnabled() { preferences.enabled.toggle(); engine.refresh() }
     @objc private func toggleApproval() { preferences.asksBeforeCorrecting.toggle(); engine.refresh() }

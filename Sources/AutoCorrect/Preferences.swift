@@ -21,6 +21,15 @@ final class Preferences {
         get { defaults.object(forKey: "showsCorrectionPopup") as? Bool ?? true }
         set { defaults.set(newValue, forKey: "showsCorrectionPopup") }
     }
+    /// Sentence-level suggestions (never automatic edits), each category on its own switch.
+    var grammarSuggestions: Bool {
+        get { defaults.object(forKey: "grammarSuggestions") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "grammarSuggestions") }
+    }
+    var punctuationSuggestions: Bool {
+        get { defaults.object(forKey: "punctuationSuggestions") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "punctuationSuggestions") }
+    }
     var showsSpellingIndicators: Bool {
         get { defaults.object(forKey: "showsSpellingIndicators") as? Bool ?? true }
         set { defaults.set(newValue, forKey: "showsSpellingIndicators") }

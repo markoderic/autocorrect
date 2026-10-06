@@ -14,6 +14,9 @@ public struct ManualRewriteProtection {
         let created: TimeInterval
         var manualEdit = false
         var confirmedOverride = false
+        /// A casing-only edit of a word still being typed (first-letter capitalization). Such an
+        /// entry suppresses only re-capitalizing the same letters, never a later spelling repair.
+        var caseOnly = false
     }
     private var entries: [Entry] = []
     public init() {}
@@ -24,7 +27,8 @@ public struct ManualRewriteProtection {
     /// arriving before the asynchronous post-completion or Accessibility verification.
     @discardableResult
     public mutating func recordPostedCorrection(field: UUID, text: String, windowStart: Int,
-                                               range: NSRange, replacement: String, now: TimeInterval) -> UUID? {
+                                               range: NSRange, replacement: String, now: TimeInterval,
+                                               caseOnly: Bool = false) -> UUID? {
         prune(now: now)
         guard (1...256).contains(text.utf16.count), windowStart >= 0,
               windowStart <= Int.max - text.utf16.count,
@@ -48,7 +52,7 @@ public struct ManualRewriteProtection {
         let id = UUID()
         entries.append(Entry(id: id, field: field, location: location,
                              prefixLocation: location - length, prefix: Array(text[start..<span.lowerBound].utf16),
-                             replacement: replacement, created: now))
+                             replacement: replacement, created: now, caseOnly: caseOnly))
         if entries.count > 8 { entries.removeFirst(entries.count - 8) }
         return id
     }
@@ -61,6 +65,15 @@ public struct ManualRewriteProtection {
     }
 
     public mutating func remove(_ id: UUID) { entries.removeAll { $0.id == id } }
+
+    /// An explicit Undo of the correction at `location` is a deliberate rejection even when the
+    /// correction only changed letter case: the occurrence is protected like any other rewrite.
+    public mutating func noteExplicitRejection(field: UUID, location: Int) {
+        for index in entries.indices where entries[index].field == field && entries[index].location == location {
+            entries[index].caseOnly = false
+            entries[index].manualEdit = true
+        }
+    }
 
     public mutating func suppresses(field: UUID, candidate: CorrectionCandidate, text: String,
                                    windowStart: Int, now: TimeInterval) -> Bool {
@@ -78,6 +91,10 @@ public struct ManualRewriteProtection {
             let entry = entries[index]
             guard entry.manualEdit, entry.field == field, entry.location == location,
                   candidate.original != entry.replacement, windowStart <= entry.prefixLocation else { continue }
+            // Deleting part of a word after its first letter was capitalized says nothing about
+            // the spelling of the word eventually typed: only the identical letters retyped in
+            // lowercase count as a deliberate choice.
+            if entry.caseOnly, candidate.original.lowercased() != entry.replacement.lowercased() { continue }
             let start = entry.prefixLocation - windowStart
             guard start <= length, entry.prefix.count <= length - start,
                   units[start..<(start + entry.prefix.count)].elementsEqual(entry.prefix) else { continue }

@@ -19,7 +19,7 @@ public enum BuiltInReplacements {
         "instagram": "Instagram", "facebook": "Facebook", "reddit": "Reddit", "spotify": "Spotify",
         "netflix": "Netflix", "gmail": "Gmail", "icloud": "iCloud", "imessage": "iMessage", "facetime": "FaceTime",
         "ipados": "iPadOS", "watchos": "watchOS", "airdrop": "AirDrop", "airplay": "AirPlay", "airtag": "AirTag",
-        "testflight": "TestFlight", "xcode": "Xcode",
+        "testflight": "TestFlight", "xcode": "Xcode", "claude": "Claude", "openai": "OpenAI",
         "pdf": "PDF", "png": "PNG", "jpeg": "JPEG", "jpg": "JPG", "gif": "GIF", "svg": "SVG",
         "csv": "CSV", "json": "JSON", "html": "HTML", "css": "CSS", "xml": "XML", "sql": "SQL",
         "http": "HTTP", "https": "HTTPS", "url": "URL", "usb": "USB",

@@ -24,6 +24,13 @@ public enum EnglishWritingRules {
         "mightve": "might've", "mustve": "must've", "aint": "ain't", "yall": "y'all", "oclock": "o'clock"
     ]
 
+    /// Weekdays and the months that are not also ordinary words. "may", "march" and "august"
+    /// are left alone: the verb, the verb and the adjective are far more common in prose.
+    private static let capitalizedNames: Set<String> = [
+        "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
+        "january", "february", "april", "june", "july", "september", "october", "november", "december"
+    ]
+
     private static func isEnglish(_ language: String) -> Bool {
         language.replacingOccurrences(of: "-", with: "_").split(separator: "_").first?.lowercased() == "en"
     }
@@ -140,6 +147,10 @@ public enum EnglishWritingRules {
         // This deliberate prose default also overrides the musical-note dictionary entry.
         // Add "ti" to Ignored Words to keep that spelling in specialist writing.
         if lower == "ti" { return original.first?.isUppercase == true ? "It" : "it" }
+        if capitalizedNames.contains(lower) {
+            let capitalized = lower.prefix(1).uppercased() + lower.dropFirst()
+            return capitalized == original ? nil : capitalized
+        }
         // Ambiguous ordinary words (ill, well, were, its, id, lets, etc.) are not rules.
         guard let contraction = contractions[lower] else { return nil }
         if contraction.first == "I" { return contraction }

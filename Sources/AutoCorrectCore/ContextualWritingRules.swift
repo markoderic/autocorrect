@@ -172,13 +172,24 @@ public enum ContextualWritingRules {
                 "whether", "unless", "until", "so", "is"].contains(previous)
     }
 
+    /// Words that can open a clause without being its subject. A clause whose words before
+    /// the candidate are all of this kind (at most three) still starts at the candidate:
+    /// "Ok then lets go", "No lets do it", "Yes please lets start". Any other word before
+    /// the candidate ("she then lets go", "no one lets him") means the candidate is a verb.
+    private static let discourseWords: Set<String> = [
+        "ok", "okay", "well", "so", "now", "then", "and", "but", "please", "alright", "right",
+        "yes", "yeah", "yep", "no", "nope", "sure", "fine", "oh", "hmm", "hey", "hi", "thanks",
+        "anyway", "also", "first", "next", "otherwise", "cool", "great", "perfect", "nice", "awesome"
+    ]
+
     private static func startsClause(at offset: Int, in text: NSString) -> Bool {
         let prefix = text.substring(to: offset).trimmingCharacters(in: CharacterSet(charactersIn: " ([\"“«{"))
         if prefix.isEmpty || prefix.last.map({ ".!?\n".contains($0) }) == true { return true }
-        // Short discourse openers only: do not treat "she then lets go" as an invitation.
+        // Short discourse runs only: do not treat "she then lets go" as an invitation.
         let clause = prefix.components(separatedBy: CharacterSet(charactersIn: ".!?\n")).last ?? prefix
-        let opener = clause.trimmingCharacters(in: .whitespaces).lowercased()
-        return ["ok", "ok,", "okay", "okay,", "well", "well,", "so", "so,", "now", "now,",
-                "then", "and", "and then", "but", "please", "alright", "alright,"].contains(opener)
+        let words = clause.lowercased().replacingOccurrences(of: ",", with: " ")
+            .split(separator: " ", omittingEmptySubsequences: true).map(String.init)
+        guard (1...3).contains(words.count) else { return false }
+        return words.allSatisfy(discourseWords.contains)
     }
 }
