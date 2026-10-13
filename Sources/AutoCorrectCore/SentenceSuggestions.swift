@@ -47,9 +47,6 @@ public enum SuggestionValidator {
     private static let number = try! NSRegularExpression(pattern: "\\d[\\d,.:]*")
     private static let protected = try! NSRegularExpression(pattern: "`[^`\\n]+`|https?://[^\\s)\\]]+|[\\w.+-]+@[\\w-]+\\.[\\w.-]+|(?:~|\\.)?/[\\w./-]+/[\\w./-]*|\\b[A-Z][A-Z0-9_]+=\\S+|\\b\\w+\\.(?:[a-z]{2,4})\\b")
     private static let word = try! NSRegularExpression(pattern: "[\\p{L}\\p{N}'’]+")
-    // Apostrophes within words are not quotation delimiters. An unfinished quote protects
-    // the remainder too, since a paused clause can arrive before its closing quote.
-    private static let quotation = try! NSRegularExpression(pattern: #""[^"\n]*(?:"|$)|“[^”\n]*(?:”|$)|(?<![\p{L}\p{N}])'[^'\n]*(?:'(?![\p{L}\p{N}])|$)|‘[^’\n]*(?:’|$)"#)
 
     /// Turns raw edits for `sentence` into suggestions, dropping anything ambiguous or unsafe:
     /// an original that is empty, identical to its replacement, absent or not unique in the
@@ -61,7 +58,7 @@ public enum SuggestionValidator {
     /// keep the first.
     public static func validate(sentence: String, edits: [ProposedEdit], options: Options = Options()) -> [SentenceSuggestion] {
         let ns = sentence as NSString
-        let quotes = quotation.matches(in: sentence, range: NSRange(location: 0, length: ns.length)).map(\.range)
+        let quotes = quotationRanges(in: sentence)
         var accepted: [SentenceSuggestion] = []
         for edit in edits {
             let anchored = edit.category.lowercased() == "punctuation"
@@ -170,6 +167,33 @@ public enum SuggestionValidator {
     /// The last complete sentence of a bounded text window (terminator required).
     public static func lastCompleteSentence(in text: String, minimumWords: Int = 3, maximumLength: Int = 512) -> (sentence: String, range: NSRange)? {
         analysisUnit(in: text, allowUnterminated: false, minimumWords: minimumWords, maximumLength: maximumLength)
+    }
+
+    /// A quote can itself contain contractions. Track delimiters instead of letting
+    /// the apostrophe in don't terminate (or invalidate) a single-quoted span.
+    private static func quotationRanges(in text: String) -> [NSRange] {
+        let characters = Array(text)
+        var ranges: [NSRange] = []
+        var closing: Character?
+        var start = 0, offset = 0
+        for (index, character) in characters.enumerated() {
+            let width = String(character).utf16.count
+            let previousIsLetter = index > 0 && characters[index - 1].isLetter
+            let nextIsLetter = index + 1 < characters.count && characters[index + 1].isLetter
+            let apostrophe = (character == "'" || character == "’") && previousIsLetter && nextIsLetter
+            if let delimiter = closing {
+                if character == delimiter && !apostrophe {
+                    ranges.append(NSRange(location: start, length: offset + width - start))
+                    closing = nil
+                }
+            } else if character == "\"" || character == "“" || character == "‘" || (character == "'" && !previousIsLetter) {
+                start = offset
+                closing = character == "“" ? "”" : character == "‘" ? "’" : character
+            }
+            offset += width
+        }
+        if closing != nil { ranges.append(NSRange(location: start, length: offset - start)) }
+        return ranges
     }
 
     private static func isBoundary(_ ns: NSString, at index: Int, before: Bool) -> Bool {

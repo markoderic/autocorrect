@@ -5,6 +5,17 @@ import XCTest
 /// Native en_US often recommends a same-length consonant substitution or a deletion
 /// while its own top guesses contain a repair that keeps every typed letter.
 final class EditTypePreferenceTests: XCTestCase {
+    func testRegionalDictionaryLookupRequiresSpellingVariantEvidence() {
+        for (original, suggestion) in [("organise", "organize"), ("colour", "color"),
+            ("Organising", "Organizing"), ("centre", "center"), ("metres", "meters"), ("travelled", "traveled")] {
+            XCTAssertTrue(CorrectionPolicy.isRegionalSpellingPair(original, suggestion))
+        }
+        for (original, suggestion) in [("Higgsfield", "Higginsfield"), ("Ngozi", "Ngoni"),
+            ("bedore", "before"), ("hydrophobe", "hydrophone"), ("Higgsfield", "Higgsfield")] {
+            XCTAssertFalse(CorrectionPolicy.isRegionalSpellingPair(original, suggestion))
+        }
+        XCTAssertFalse(CorrectionPolicy.isRegionalSpellingPair("Higgsfield", nil))
+    }
     func testConflictingContentWordsNeedReviewButClearRepairsRemainAutomatic() {
         for (word, chosen, native, guesses) in [
             ("bedore", "bedsore", "before", ["before", "bedsore"]),

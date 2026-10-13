@@ -13,6 +13,23 @@ public struct CorrectionCandidate: Equatable, Sendable {
 
 /// Conservative, side-effect-free rules shared by the keyboard and Accessibility layers.
 public enum CorrectionPolicy {
+    /// A reason to consult another English dictionary, not a correction rule. Avoid
+    /// additional service calls for unrelated names/typos; a failed native lookup can
+    /// otherwise look like a dictionary accepting the input.
+    public static func isRegionalSpellingPair(_ original: String, _ suggestion: String?) -> Bool {
+        guard let suggestion, original.lowercased() != suggestion.lowercased() else { return false }
+        func key(_ input: String) -> String {
+            var value = input.lowercased()
+            for (a, b) in [("our", "or"), ("ise", "ize"), ("isa", "iza"), ("isi", "izi"),
+                           ("yse", "yze"), ("ll", "l"), ("ae", "e"), ("oe", "e"), ("ogue", "og")] {
+                value = value.replacingOccurrences(of: a, with: b)
+            }
+            if value.hasSuffix("re") { value = String(value.dropLast(2)) + "er" }
+            if value.hasSuffix("res") { value = String(value.dropLast(3)) + "ers" }
+            return value
+        }
+        return key(original) == key(suggestion)
+    }
     /// Only ordinary spaces and sentence punctuation trigger a correction. Return and Tab
     /// deliberately do not: they can send a message, submit a form, or move focus.
     public static func isDelimiter(_ character: Character) -> Bool {

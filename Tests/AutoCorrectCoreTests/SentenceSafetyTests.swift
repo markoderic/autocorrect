@@ -23,6 +23,10 @@ final class SentenceSafetyTests: XCTestCase {
         XCTAssertEqual(applyRules("She said \"all fine\" but he could of waited."),
                        "She said \"all fine\" but he could have waited.")
         XCTAssertEqual(applyRules("Don't change 'we was late' in the transcript."), "Don't change 'we was late' in the transcript.")
+        for quote in ["'don't change we was late'", "‘don’t change we was late’", "'don't change we was late"] {
+            let text = "He wrote " + quote
+            XCTAssertEqual(applyRules(text), text)
+        }
     }
 
     func testUnsupportedModelParaphrasesAndMalformedRepairsAreRejected() {

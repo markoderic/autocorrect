@@ -18,7 +18,7 @@ final class CurrentSentenceAuditTests: XCTestCase {
    for line in data.split(separator: "\n") {
     let item = try JSONSerialization.jsonObject(with: Data(line.utf8)) as! [String: Any]
     let text = item["text"] as! String
-    var row: [String: Any] = ["candidate": "production_sentence", "version": "0.3.14", "item": item["id"]!, "task": task, "corrected": text, "analyzer": analyzer.availability.summary, "cold": count == 0]
+    var row: [String: Any] = ["candidate": "production_sentence", "version": "0.3.15", "item": item["id"]!, "task": task, "corrected": text, "analyzer": analyzer.availability.summary, "cold": count == 0]
     let start = Date()
     if let unit = SuggestionValidator.analysisUnit(in: text, allowUnterminated: true), unit.sentence == text.trimmingCharacters(in: .whitespacesAndNewlines) {
      do {

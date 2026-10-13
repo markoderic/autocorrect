@@ -1221,7 +1221,8 @@ final class CorrectionEngine {
             // A word accepted by another English dictionary is not a typo just because
             // the selected region prefers a different spelling. Bound this to the two
             // supported regional dictionaries and the existing per-context cache.
-            if preferences.language.lowercased().hasPrefix("en") {
+            if preferences.language.lowercased().hasPrefix("en"),
+               CorrectionPolicy.isRegionalSpellingPair(word, proposed ?? guesses.first) {
                 let otherEnglish = preferences.language == "en_GB" ? "en_US" : "en_GB"
                 let regionalDocument = NSSpellChecker.uniqueSpellDocumentTag()
                 let regionalMatch = checker.checkSpelling(of: word, startingAt: 0, language: otherEnglish,
