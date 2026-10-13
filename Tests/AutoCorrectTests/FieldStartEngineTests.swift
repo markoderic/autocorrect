@@ -162,6 +162,25 @@ final class FieldStartEngineTests: XCTestCase {
     }
 
     func testCapitalizedTyposStayDetectableWhereSentencesStart() {
+        // This integration test needs live spelling/correction services, not a cold
+        // NSSpellServer timeout masquerading as "no misspelling". macOS 14 hosted
+        // runners can time out their first correction/guess requests for this fixture.
+        // Wait for the asynchronous service request, keeping all engine assertions below.
+        // No dictionary learning, retries of failed assertions, or skipped coverage.
+        let checker = NSSpellChecker.shared
+        for language in ["en_US", "en_GB"] {
+            let ready = expectation(description: "Native checker ready: \(language)")
+            let tag = NSSpellChecker.uniqueSpellDocumentTag()
+            let text = "Higgsfield "
+            let orthography = NSOrthography(dominantScript: "Latn", languageMap: ["Latn": [language]])
+            checker.requestChecking(of: text, range: NSRange(location: 0, length: text.utf16.count),
+                types: NSTextCheckingResult.CheckingType.spelling.rawValue | NSTextCheckingResult.CheckingType.correction.rawValue,
+                options: [.orthography: orthography], inSpellDocumentWithTag: tag) { _, _, _, _ in
+                    ready.fulfill()
+                }
+            wait(for: [ready], timeout: 10)
+            checker.closeSpellDocument(withTag: tag)
+        }
         // A capitalized word the native checker rejects is marked where a sentence starts;
         // the same word mid-sentence is treated as a name. (Higgsfield is not in the bundled
         // lexicon: before this batch only its capital letter kept it unmarked.)
