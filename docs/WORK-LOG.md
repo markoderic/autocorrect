@@ -646,3 +646,8 @@ Status: completed implementation/release work with explicit open acceptance gate
 
 - Status: NO CHANGE (clarification recorded). Owner confirms the symptom is a doubled character such as `aa` after one intended press, rather than a duplicated word/space after correction. Specific key, host app and timing relative to correction remain unknown. This narrows the symptom but does not establish software versus hardware cause.
 - Next diagnostic remains a short physical typing comparison with AutoCorrect running versus fully quit in the same disposable document, then a second app if needed. Do not implement blanket duplicate-character suppression: deliberate double letters and held-key repeat must remain intact. No runtime/settings changes, tests, builds, installation or release.
+
+### 2026-10-13 10:44 EDT — Codex — GitHub download trust confirmation
+
+- Status: NO CHANGE (read-only verification). Owner asks whether the GitHub download triggers the earlier virus/unverified-app warning. Live v0.3.15 asset digest remains `834f5a45862365af671d5b349ad94bc9c216cc110b4de9a282f10c099663e8c0`, exactly matching the previously browser-downloaded, quarantine-retained Gatekeeper-accepted artifact. Saved Apple response remains Accepted for submission `fd209637-144a-481d-bb05-90d1eb0b000b`. No new download/launch test performed. Explain that this addresses the earlier cannot-check-for-malicious-software block; normal first-open confirmation may remain, and another-Mac behavior is not yet observed.
+- Earlier owner clarification: doubled-character symptom is intermittent, not every keypress. A short clean typing trial cannot exclude it. No code/settings/build/install/release changes.
