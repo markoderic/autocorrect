@@ -4,13 +4,14 @@ This is the durable handoff between Claude, Codex and the owner. Read [CLAUDE-HA
 
 ## Current resume state
 
-- **As of:** October 12, 2026: 0.3.13 installed and running; local verification passed; source push and hosted CI pending below.
+- **As of:** October 12, 2026: 0.3.13 installed and running; source `ac41af5` pushed; local and hosted verification passed.
 - **Latest task:** contextual coordinated invitations and multiple modifiers; public-release preflight/version/output consistency; concrete 1.0 acceptance checklist. Starting main `7c93aa4`. Existing planning/evaluation artifacts and `.gitignore` changes preserved separately.
 - **Installed app:** `/Applications/AutoCorrect.app` 0.3.13, universal, same Apple Development identity; strict signature verified. Executable SHA-256 `03a95c66cc8fa9a8700ec2fb715baeb084b0fa16b70e2902c803655ae001cbfe`. Rollback: `/Applications/AutoCorrect.previous-20261012-234609.app` (0.3.12).
 - **Artifact/public release:** ZIP SHA-256 `3e62172b0223f14f357a24f0270140fd8a014a53e46d8a9cb58af2b7d9bfb407`; extracted strict signature and both architectures verified. Public release remains v0.3.7, confirmed through GitHub; no cask or public download update.
 - **Validation:** 358 Swift tests executed / 356 passed / two gated skips / zero failures. Six isolated release-orchestration tests passed. Installed diagnostics and native Settings show Ready, permissions allowed, listener/layout available and login enabled. Actual Settings preview repairs the coordinated invitation and leaves the third-person control unchanged; cleared after testing. Physical typing and real-editor Apply/Undo remain unverified.
 - **Signing:** owner reports an App Store developer account. Local inventory still contains Apple Development only. Developer ID Application creation/import and local notary profile setup are pending; no actual submission, notarization or clean-Mac Gatekeeper pass.
-- **Next:** review hosted CI after source push; follow `docs/RELEASE-READINESS.md` for physical typing, fresh accuracy evaluation, second-host/runtime and final download checks. `docs/NOTARIZATION.md` has account setup and `release.sh --check` instructions.
+- **Hosted CI:** [38343373364](https://github.com/markoderic/autocorrect/actions/runs/38343373364), runtime `ac41af5881838ef00be922eaf0a7790a8082ef3b`: Swift tests, six release-script checks, universal build and archive upload passed.
+- **Next:** Xcode is open to Settings → Apple Accounts; no account is signed in. Owner sign-in requested asynchronously; no credentials entered or certificate created. Then follow `docs/RELEASE-READINESS.md` for physical typing, fresh accuracy evaluation, second-host/runtime and final download checks. `docs/NOTARIZATION.md` has account setup and `release.sh --check` instructions.
 - **Authorization boundary:** standing installation/source-push authorization after review used. No public release or credential/account changes performed.
 
 ## Entry template — copy for every task
@@ -541,3 +542,9 @@ Status: completed implementation/release work with explicit open acceptance gate
 - Signed universal build passed after final conservative syntax review. Extracted signature and both architectures verified. Initial extra verification passed two architectures in one lipo invocation, which this tool rejected; separate per-architecture checks passed. Build-script architecture checks had already passed. Quit via app menu, installed with rollback, verified diagnostics/hash, relaunched. One startup UI lookup timed out; retry showed Ready and both permissions allowed.
 - Installed native Settings preview: coordinated fixture produced the expected apostrophe; third-person fixture produced “No change suggested.” Cleared disposable text. No physical keyboard or cross-app pass inferred from this. Existing app preferences/permissions preserved.
 - Source push and hosted CI pending; no public release, notarization, account modification or downloaded model. Existing research and October 11 log change remain outside this task's staged scope.
+
+### Final checkpoint — installed source and hosted verification complete; signing setup pending
+
+- Runtime/source `ac41af5881838ef00be922eaf0a7790a8082ef3b` pushed to main. Hosted [38343373364](https://github.com/markoderic/autocorrect/actions/runs/38343373364) completed successfully: Swift tests, six release orchestration checks, universal build and artifact upload. This documentation-only follow-up records completion without changing the installed binary.
+- Read-only Xcode account inspection found no signed-in Apple Account. Left Xcode Settings → Apple Accounts open and asked the owner to sign in locally and reply ready. No credentials, certificate, signing permissions or Apple account state changed. Developer ID/notarization remains blocked on setup; physical typing and broader accuracy gates remain open. No 1.0 or public-release claim.
+- Prior unrelated `.gitignore`, evaluation/planning artifacts and October 11 log note preserved unstaged. No public assets or cask changed.
