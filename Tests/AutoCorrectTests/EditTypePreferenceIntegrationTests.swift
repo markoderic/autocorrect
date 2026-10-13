@@ -30,10 +30,21 @@ final class EditTypePreferenceIntegrationTests: XCTestCase {
     }
 
     func testLetterPreservingRepairsReplaceNativeConsonantSubstitutionsAndDeletions() {
-        for (source, expected) in ["higer": "higher", "chuch": "church", "sevice": "service", "caost": "coast",
+        for (source, expected) in ["higer": "higher", "sevice": "service", "caost": "coast",
                                    "returnd": "returned", "considerd": "considered", "diety": "deity",
-                                   "twon": "town", "stong": "strong", "seach": "search", "peom": "poem"] {
+                                   "twon": "town", "seach": "search", "peom": "poem"] {
             check(source, expected)
+        }
+    }
+
+
+    func testAmbiguousContentWordsRemainForReview() {
+        // Both readings are real words; a letter-preserving guess is not enough
+        // evidence to silently choose church over couch or strong over song.
+        for (source, allowed) in [("chuch", ["church", "couch"]), ("stong", ["strong", "song"]),
+                                  ("devided", ["divided"]), ("whant", ["want"])] {
+            let result = engine.suggestion(in: "we said \(source) ")
+            XCTAssertTrue(result == nil || allowed.contains(result!), "\(source): \(result ?? "review")")
         }
     }
 

@@ -39,8 +39,8 @@ final class SuggestionValidatorTests: XCTestCase {
         XCTAssertEqual(SuggestionValidator.validate(sentence: "Send it to Tom and I by Friday.", edits: [edit("Tom and I", "Tom and me")]).count, 1)
         XCTAssertEqual(SuggestionValidator.validate(sentence: "The outage didn't effect the EU customers.", edits: [edit("effect", "affect")]).count, 1)
         XCTAssertEqual(SuggestionValidator.validate(sentence: "I bought apples bananas and oranges.", edits: [edit("apples bananas and oranges", "apples, bananas, and oranges", "punctuation", "List commas")]).count, 1)
-        XCTAssertTrue(SuggestionValidator.validate(sentence: "Revenue was 4,200,000 dollars , up 12 %.", edits: [edit("dollars ,", "dollars,", "punctuation")]).isEmpty,
-                      "a span ending in punctuation cannot be applied by the keyboard edit plan, so it is not offered")
+        XCTAssertEqual(SuggestionValidator.validate(sentence: "Revenue was 4,200,000 dollars , up 12 %.", edits: [edit("dollars ,", "dollars,", "punctuation")]).first?.original,
+                       "dollars , up", "unchanged following word anchors the existing keyboard plan")
         XCTAssertEqual(SuggestionValidator.validate(sentence: "Thanks Maria I owe you one.", edits: [edit("Thanks Maria I", "Thanks, Maria, I", "punctuation")]).count, 1)
     }
 

@@ -5,6 +5,25 @@ import XCTest
 /// Native en_US often recommends a same-length consonant substitution or a deletion
 /// while its own top guesses contain a repair that keeps every typed letter.
 final class EditTypePreferenceTests: XCTestCase {
+    func testConflictingContentWordsNeedReviewButClearRepairsRemainAutomatic() {
+        for (word, chosen, native, guesses) in [
+            ("bedore", "bedsore", "before", ["before", "bedsore"]),
+            ("lastr", "laster", "last", ["last", "laser", "laster"]),
+            ("devided", "decided", "decided", ["decided", "divided"]),
+            ("whant", "what", "what", ["what", "want"])
+        ] {
+            XCTAssertTrue(CorrectionPolicy.needsReviewForCompetingWords(word, replacement: chosen, native: native, guesses: guesses))
+        }
+        for (word, chosen, native, guesses) in [
+            ("teh", "the", "the", ["the", "ten"]),
+            ("kiding", "kidding", "hiding", ["hiding", "kidding"]),
+            ("returnd", "returned", "returns", ["returns", "returned"]),
+            ("higer", "higher", "tiger", ["tiger", "higher"]),
+            ("calandar", "calendar", "calendar", ["calendar", "calandra"])
+        ] {
+            XCTAssertFalse(CorrectionPolicy.needsReviewForCompetingWords(word, replacement: chosen, native: native, guesses: guesses))
+        }
+    }
     private func alternatives(_ word: String, _ accepted: String, _ guesses: [String]) -> [String] {
         CorrectionPolicy.letterPreservingAlternatives(for: word, accepted: accepted, guesses: guesses)
     }

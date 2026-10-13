@@ -129,12 +129,12 @@ final class FieldStartEngineTests: XCTestCase {
         for text in ["font ", "I dent ", "donut ", "Marko ", "dont.txt ", "I odnt.txt ", "I odnts "] {
             XCTAssertNil(engine.suggestion(in: text), text)
         }
-        // Unchanged baseline behavior, recorded here so a later change is deliberate: `cant`
-        // and `wont` are documented prose defaults, and the general one-edit gate still
-        // accepts the native reading of `dotn` (down) and `ont` (not).
+        // Prose defaults remain. The new conflict gate may defer dotn rather than
+        // committing to down; it must never invent a negative contraction here.
         XCTAssertEqual(engine.suggestion(in: "cant "), "can't")
         XCTAssertEqual(engine.suggestion(in: "wont "), "won't")
-        XCTAssertEqual(engine.suggestion(in: "I dotn "), "down")
+        let dotn = engine.suggestion(in: "I dotn ")
+        XCTAssertTrue(dotn == nil || dotn == "down")
         XCTAssertEqual(engine.suggestion(in: "I dnt "), "dint")
         preferences.customCorrections = ["odnt": "ODNT Ltd"]
         XCTAssertEqual(engine.suggestion(in: "I odnt "), "ODNT Ltd")

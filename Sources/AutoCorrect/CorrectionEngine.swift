@@ -1218,6 +1218,22 @@ final class CorrectionEngine {
             #if DEBUG
             nativeAssessmentObserver?(preferences.language, nativeMisspelled, proposed, guesses)
             #endif
+            // A word accepted by another English dictionary is not a typo just because
+            // the selected region prefers a different spelling. Bound this to the two
+            // supported regional dictionaries and the existing per-context cache.
+            if preferences.language.lowercased().hasPrefix("en") {
+                let otherEnglish = preferences.language == "en_GB" ? "en_US" : "en_GB"
+                let regionalDocument = NSSpellChecker.uniqueSpellDocumentTag()
+                let regionalMatch = checker.checkSpelling(of: word, startingAt: 0, language: otherEnglish,
+                    wrap: false, inSpellDocumentWithTag: regionalDocument, wordCount: nil).location == NSNotFound
+                checker.closeSpellDocument(withTag: regionalDocument)
+                if regionalMatch {
+                    let preserved = Assessment(misspelled: false, replacement: nil, automatic: false)
+                    if cache.count >= 256 { cache.removeAll(keepingCapacity: true) }
+                    cache[key] = preserved
+                    return preserved
+                }
+            }
             if let contraction = EnglishWritingRules.typoReplacement(for: word, language: preferences.language,
                                                                      systemCorrection: proposed, guesses: guesses) {
                 return Assessment(misspelled: true, replacement: contraction, automatic: true)
@@ -1229,8 +1245,26 @@ final class CorrectionEngine {
                     }) {
                 return Assessment(misspelled: true, replacement: split, automatic: preferences.separatesJoinedWords)
             }
+            var productRepair = preferences.normalizesProductNames
+                ? NameLexicon.typoReplacement(for: word, systemCorrection: proposed, guesses: guesses) : nil
+            if preferences.normalizesProductNames, productRepair == nil, word.first?.isLowercase == true,
+               preferences.language == "en_US",
+               NameLexicon.typoReplacement(for: word, systemCorrection: nil, guesses: []) != nil {
+                // Some native services return nonwords as competing guesses (gxthbu).
+                // For a unique curated product typo, require ordinary-word competitors
+                // to be recognized by the second English dictionary before blocking it.
+                let tag = NSSpellChecker.uniqueSpellDocumentTag()
+                func recognized(_ candidate: String) -> Bool {
+                    checker.checkSpelling(of: candidate, startingAt: 0, language: "en_GB",
+                        wrap: false, inSpellDocumentWithTag: tag, wordCount: nil).location == NSNotFound
+                }
+                let credible = guesses.prefix(5).filter(recognized)
+                let native = proposed.flatMap { recognized($0) ? $0 : nil }
+                checker.closeSpellDocument(withTag: tag)
+                productRepair = NameLexicon.typoReplacement(for: word, systemCorrection: native, guesses: credible)
+            }
             if preferences.normalizesProductNames,
-               let product = NameLexicon.typoReplacement(for: word, systemCorrection: proposed, guesses: guesses),
+               let product = productRepair,
                (BuiltInReplacements.casing[product.lowercased()] == product ||
                 NameLexicon.canonicalReplacement(for: product.lowercased(), nativeMisspelled:
                    checker.checkSpelling(of: product.lowercased(), startingAt: 0, language: preferences.language,
@@ -1268,6 +1302,17 @@ final class CorrectionEngine {
                 if alternatives.count == 1 { confident = alternatives[0] } else if alternatives.count > 1 { confident = nil }
             }
             // Dictionary guesses can cover larger mistakes, but never apply them without approval.
+            if let repair = confident, CorrectionPolicy.needsReviewForCompetingWords(word,
+                replacement: repair, native: proposed, guesses: guesses) { confident = nil }
+            // Unknown title-cased tokens inside prose may be personal names. A spell
+            // checker suggesting another name is not authority to change someone's name.
+            // Explicit custom/built-in/name-lexicon corrections were handled above.
+            if word.first?.isUppercase == true, wordRange.location > 0 {
+                let prefix = (text as NSString).substring(to: wordRange.location).trimmingCharacters(in: .whitespacesAndNewlines)
+                if let last = prefix.last, !"!?".contains(last) {
+                    confident = nil
+                }
+            }
             let review = preserveCompound ? guesses.first : (confident ?? phrase ?? proposed ?? guesses.first)
             answer = Assessment(misspelled: true, replacement: review, automatic: confident != nil)
         }

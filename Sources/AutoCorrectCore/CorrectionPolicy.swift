@@ -233,6 +233,48 @@ public enum CorrectionPolicy {
         case insertion(Int), deletion(Int), substitution(Int), transposition
     }
 
+    /// A substitution/deletion competing with an equally close spelling has no reliable
+    /// automatic winner. Keep such candidates available for review. Clear transpositions,
+    /// repeated-letter repairs and unopposed native recommendations retain their path.
+    public static func needsReviewForCompetingWords(_ original: String, replacement: String,
+                                                   native: String?, guesses: [String]) -> Bool {
+        let source = Array(UserDictionary.normalizedKey(original))
+        let target = UserDictionary.normalizedKey(replacement)
+        if repeatedConsonantReplacement(for: original, guesses: guesses)?.lowercased() == target { return false }
+        let distance = editDistance(source, Array(target))
+        guard distance == 1 else { return false }
+        if source.count <= 3 { return false } // established missing-vowel repairs
+        if case .transposition = singleEdit(from: original, to: replacement) { return false }
+        if target.hasSuffix("ed"), original.lowercased().hasSuffix("d"),
+           case .insertion = singleEdit(from: original, to: replacement) { return false }
+        if case .substitution(let index) = singleEdit(from: original, to: replacement),
+           "aeiouy".contains(source[index]), "aeiouy".contains(Array(target)[index]) { return false }
+        if case .deletion(let index) = singleEdit(from: original, to: replacement),
+           (index > 0 && source[index - 1] == source[index]) ||
+           (index + 1 < source.count && source[index + 1] == source[index]) { return false }
+        // Do not silently replace a native choice with a different insertion. Initial
+        // consonant substitutions (higer/tiger) retain the established omission rule.
+        if let native, native.lowercased() != target,
+           case .substitution(let index) = singleEdit(from: original, to: native), index > 0 {
+            return true
+        }
+        if let native, native.lowercased() != target,
+           case .deletion = singleEdit(from: original, to: native),
+           case .insertion = singleEdit(from: original, to: replacement) {
+            return true
+        }
+        guard let edit = singleEdit(from: original, to: replacement) else { return false }
+        switch edit {
+        case .insertion, .transposition: return false
+        case .substitution, .deletion:
+            return guesses.prefix(5).contains { guess in
+                let other = UserDictionary.normalizedKey(guess)
+                return other != target && isLetters(guess) && hasSafeCase(guess)
+                    && guess.first?.isUppercase != true && editDistance(source, Array(other)) <= distance
+            }
+        }
+    }
+
     /// Classifies exactly one edit between normalized forms; `nil` for zero or more edits.
     private static func singleEdit(from source: String, to target: String) -> SingleEdit? {
         let left = Array(UserDictionary.normalizedKey(source))

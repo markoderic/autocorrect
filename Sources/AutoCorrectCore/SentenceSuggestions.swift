@@ -43,10 +43,13 @@ public enum SuggestionValidator {
         }
     }
 
-    private static let negation = try! NSRegularExpression(pattern: "\\b(not|no|never|nothing|nobody|none|neither|nor|cannot|without)\\b|n't\\b", options: [.caseInsensitive])
+    private static let negation = try! NSRegularExpression(pattern: "\\b(not|no|never|nothing|nobody|none|neither|nor|cannot|without|dont|doesnt|didnt|cant|couldnt|wont|wouldnt|shouldnt|isnt|arent|wasnt|werent|hasnt|havent|hadnt|mustnt|neednt)\\b|n['’]\\s*t\\b", options: [.caseInsensitive])
     private static let number = try! NSRegularExpression(pattern: "\\d[\\d,.:]*")
     private static let protected = try! NSRegularExpression(pattern: "`[^`\\n]+`|https?://[^\\s)\\]]+|[\\w.+-]+@[\\w-]+\\.[\\w.-]+|(?:~|\\.)?/[\\w./-]+/[\\w./-]*|\\b[A-Z][A-Z0-9_]+=\\S+|\\b\\w+\\.(?:[a-z]{2,4})\\b")
     private static let word = try! NSRegularExpression(pattern: "[\\p{L}\\p{N}'’]+")
+    // Apostrophes within words are not quotation delimiters. An unfinished quote protects
+    // the remainder too, since a paused clause can arrive before its closing quote.
+    private static let quotation = try! NSRegularExpression(pattern: #""[^"\n]*(?:"|$)|“[^”\n]*(?:”|$)|(?<![\p{L}\p{N}])'[^'\n]*(?:'(?![\p{L}\p{N}])|$)|‘[^’\n]*(?:’|$)"#)
 
     /// Turns raw edits for `sentence` into suggestions, dropping anything ambiguous or unsafe:
     /// an original that is empty, identical to its replacement, absent or not unique in the
@@ -58,11 +61,15 @@ public enum SuggestionValidator {
     /// keep the first.
     public static func validate(sentence: String, edits: [ProposedEdit], options: Options = Options()) -> [SentenceSuggestion] {
         let ns = sentence as NSString
+        let quotes = quotation.matches(in: sentence, range: NSRange(location: 0, length: ns.length)).map(\.range)
         var accepted: [SentenceSuggestion] = []
         for edit in edits {
-            let original = edit.original
-            let replacement = edit.replacement.replacingOccurrences(of: "\n", with: " ")
+            let anchored = edit.category.lowercased() == "punctuation"
+                ? anchoredPunctuation(sentence: sentence, edit: edit) : (edit.original, edit.replacement)
+            let original = anchored.0
+            let replacement = anchored.1.replacingOccurrences(of: "\n", with: " ")
             guard !original.isEmpty, original != replacement, replacement.count <= original.count * 2 + 24,
+                  original.caseInsensitiveCompare(replacement) != .orderedSame,
                   UserDictionary.isValidReplacement(replacement),
                   // The guarded keyboard edit plan replaces spans that begin and end with letters;
                   // a span it could not apply must never be offered.
@@ -77,6 +84,9 @@ public enum SuggestionValidator {
             let second = ns.range(of: original, options: [], range: NSRange(location: NSMaxRange(first), length: ns.length - NSMaxRange(first)))
             guard second.location == NSNotFound else { continue }
             guard isBoundary(ns, at: first.location, before: true), isBoundary(ns, at: NSMaxRange(first), before: false) else { continue }
+            // Reject the entire proposal if it touches a quotation. Matching just sets
+            // of quoted strings would allow moving, duplicating or deleting one copy.
+            guard !quotes.contains(where: { NSIntersectionRange($0, first).length > 0 }) else { continue }
             if accepted.contains(where: { NSIntersectionRange($0.range, first).length > 0 }) { continue }
             let before = ns.replacingCharacters(in: first, with: "") as String
             let after = ns.replacingCharacters(in: first, with: replacement) as String
@@ -86,6 +96,22 @@ public enum SuggestionValidator {
             guard Set(matches(protected, in: sentence)).isSubset(of: Set(matches(protected, in: after))) else { continue }
             guard matches(negation, in: sentence).count == matches(negation, in: after).count else { continue }
             guard capitalizedWords(in: sentence, excludingFirst: true).isSubset(of: capitalizedWords(in: after, excludingFirst: false)) else { continue }
+            guard preservesVocabulary(original, replacement, category: category) else { continue }
+            // Apostrophes must not turn possessive its into it is before a noun.
+            if original.lowercased() == "its", replacement.lowercased().replacingOccurrences(of: "’", with: "'") == "it's" {
+                var justified = false
+                for boundary in sentence.indices where CorrectionPolicy.isDelimiter(sentence[boundary]) {
+                    let prefix = String(sentence[...boundary])
+                    if let candidate = ContextualWritingRules.candidate(in: prefix), candidate.range == first,
+                       candidate.replacement.lowercased() == "it's" { justified = true; break }
+                }
+                guard justified else { continue }
+            }
+            // A model pluralizing the noun after a/an creates a new agreement error.
+            if replacement.lowercased() == original.lowercased() + "s" || replacement.lowercased() == original.lowercased() + "es" {
+                let preceding = ns.substring(to: first.location).lowercased().split(whereSeparator: \.isWhitespace).last
+                if preceding == "a" || preceding == "an" { continue }
+            }
             let explanation = edit.explanation.trimmingCharacters(in: .whitespacesAndNewlines)
             accepted.append(SentenceSuggestion(category: category, range: first, original: original, replacement: replacement,
                                                explanation: explanation.isEmpty ? defaultExplanation(category) : String(explanation.prefix(120)),
@@ -153,6 +179,66 @@ public enum SuggestionValidator {
         return !(CharacterSet.alphanumerics.contains(scalar) || scalar == "_")
     }
 
+    /// Include unchanged adjacent words when a punctuation proposal has non-letter
+    /// edges. This keeps the existing keyboard-plan contract, instead of weakening it.
+    /// Final punctuation with no following word remains unsupported and is rejected.
+    private static func anchoredPunctuation(sentence: String, edit: ProposedEdit) -> (String, String) {
+        guard !edit.original.isEmpty else { return (edit.original, edit.replacement) }
+        let ns = sentence as NSString
+        let r = ns.range(of: edit.original)
+        guard r.location != NSNotFound,
+              ns.range(of: edit.original, range: NSRange(location: NSMaxRange(r), length: ns.length - NSMaxRange(r))).location == NSNotFound,
+              let range = Range(r, in: sentence) else { return (edit.original, edit.replacement) }
+        var start = range.lowerBound, end = range.upperBound
+        if edit.original.first?.isLetter != true || edit.replacement.first?.isLetter != true {
+            while start > sentence.startIndex, !sentence[start].isLetter { start = sentence.index(before: start) }
+            while start > sentence.startIndex, sentence[sentence.index(before: start)].isLetter { start = sentence.index(before: start) }
+        }
+        if edit.original.last?.isLetter != true || edit.replacement.last?.isLetter != true {
+            while end < sentence.endIndex, !sentence[end].isLetter { end = sentence.index(after: end) }
+            while end < sentence.endIndex, sentence[end].isLetter { end = sentence.index(after: end) }
+        }
+        let original = String(sentence[start..<end])
+        guard original.count <= 160, !original.contains("\n"), !original.contains("\r") else { return (edit.original, edit.replacement) }
+        return (original, String(sentence[start..<range.lowerBound]) + edit.replacement + String(sentence[range.upperBound..<end]))
+    }
+
+    /// A model must not paraphrase content or delete a subject while claiming a grammar
+    /// repair. Permit inflections and explicit grammar confusions, not arbitrary synonyms.
+    private static func preservesVocabulary(_ original: String, _ replacement: String,
+                                            category: SentenceSuggestion.Category) -> Bool {
+        func tokens(_ text: String) -> [String] {
+            matches(word, in: text).map { $0.lowercased().replacingOccurrences(of: "’", with: "'") }
+        }
+        let left = tokens(original), right = tokens(replacement)
+        if left == right { return true }
+        // Spacing/punctuation can split or join contractions, but cannot change letters.
+        if category == .punctuation {
+            return original.lowercased().filter(\.isLetter) == replacement.lowercased().filter(\.isLetter)
+        }
+        // Deterministic rules still go through all of the quote/name/number/transport
+        // checks above. They provide evidence for limited word-count-changing repairs.
+        if SentenceRules.proposals(in: original).contains(where: { $0.original == original && $0.replacement == replacement }) { return true }
+        guard left.count == right.count else { return false }
+        let groups: [Set<String>] = [
+            ["their", "there", "they're"], ["your", "you're"], ["its", "it's"], ["whose", "who's"],
+            ["then", "than"], ["affect", "effect"], ["to", "too"], ["a", "an"], ["less", "fewer"],
+            ["i", "me"], ["he", "him"], ["she", "her"], ["we", "us"], ["they", "them"],
+            ["is", "are", "am"], ["was", "were"], ["has", "have"], ["do", "does"], ["don't", "doesn't"],
+            ["went", "gone"], ["saw", "seen"], ["did", "done"]
+        ]
+        for (a, b) in zip(left, right) where a != b {
+            if a.replacingOccurrences(of: "'", with: "") == b.replacingOccurrences(of: "'", with: "") { continue }
+            if groups.contains(where: { $0.contains(a) && $0.contains(b) }) { continue }
+            // Agreement inflections, not tense rewrites or new content words.
+            if a + "s" == b || b + "s" == a || a + "es" == b || b + "es" == a { continue }
+            if (a.hasSuffix("y") && String(a.dropLast()) + "ies" == b) ||
+                (b.hasSuffix("y") && String(b.dropLast()) + "ies" == a) { continue }
+            return false
+        }
+        return true
+    }
+
     private static func matches(_ regex: NSRegularExpression, in text: String) -> [String] {
         let ns = text as NSString
         return regex.matches(in: text, range: NSRange(location: 0, length: ns.length)).map { ns.substring(with: $0.range) }
@@ -161,7 +247,8 @@ public enum SuggestionValidator {
     private static func capitalizedWords(in text: String, excludingFirst: Bool) -> Set<String> {
         var words = matches(word, in: text)
         if excludingFirst, !words.isEmpty { words.removeFirst() }
-        return Set(words.filter { $0.first?.isUppercase == true && $0.count > 1 && $0 != $0.uppercased() })
+        return Set(words.filter { $0.first?.isUppercase == true && $0.count > 1 && $0 != $0.uppercased() }
+            .map { $0.replacingOccurrences(of: "'", with: "").replacingOccurrences(of: "’", with: "") })
     }
 
     private static func defaultExplanation(_ category: SentenceSuggestion.Category) -> String {

@@ -65,7 +65,7 @@ final class NativeGrammarAnalyzer: SentenceAnalyzer {
             let types = NSTextCheckingResult.CheckingType.grammar.rawValue | NSTextCheckingResult.CheckingType.correction.rawValue
             let results = checker.check(sentence, range: NSRange(location: 0, length: ns.length), types: types,
                                         options: [.orthography: orthography], inSpellDocumentWithTag: tag, orthography: nil, wordCount: nil)
-            var edits: [ProposedEdit] = []
+            var edits: [ProposedEdit] = SentenceRules.proposals(in: sentence)
             for result in results {
                 switch result.resultType {
                 case .correction:
@@ -128,8 +128,9 @@ final class FoundationModelsSentenceAnalyzer: SentenceAnalyzer {
 
     func analyze(sentence: String) async throws -> [ProposedEdit] {
         let session = LanguageModelSession(instructions: Self.instructions)
-        let response = try await session.respond(to: "<text>\n\(sentence)\n</text>", generating: ModelReview.self)
-        return response.content.edits.map {
+        let response = try await session.respond(to: "<text>\n\(sentence)\n</text>", generating: ModelReview.self,
+                                                options: GenerationOptions(sampling: .greedy))
+        return SentenceRules.proposals(in: sentence) + response.content.edits.map {
             ProposedEdit(original: $0.original, replacement: $0.replacement, category: $0.category, explanation: $0.reason)
         }
     }
