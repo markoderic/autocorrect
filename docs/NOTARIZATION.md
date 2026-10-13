@@ -14,7 +14,7 @@ On September 29, 2026, the development Mac had only an Apple Development signing
 
 ## Current setup — October 12, 2026
 
-The owner reports an existing Apple Developer account with an App Store app. That membership can be used for Developer ID distribution if active and the account has the required Account Holder role. The Mac currently has only an **Apple Development** identity; App Store distribution and Developer ID Application are different certificate types.
+The owner reports an existing Apple Developer account with an App Store app. That membership can be used for Developer ID distribution if active and the account has the required Account Holder role. After explicit owner approval, Xcode created **Developer ID Application: Marko Deric (B376DM5LNP)** on October 12. The local signing identity/private key is valid; the existing Apple Development identity is preserved. App Store distribution and Developer ID Application are different certificate types. A separate 0.3.13 build in `dist/developer-id/` is Developer ID signed with hardened runtime and a secure timestamp; its extracted ZIP passes strict signature and both architecture checks. It is not yet notarized.
 
 Create a **Developer ID Application** certificate through Xcode's account certificate manager or [Apple's certificate portal instructions](https://developer.apple.com/help/account/certificates/create-developer-id-certificates/). Use the existing account; no second membership is needed. Creating a certificate in Xcode keeps its private key on this Mac. If importing an existing certificate, it also needs its corresponding private key. Do not revoke existing App Store or development certificates.
 
