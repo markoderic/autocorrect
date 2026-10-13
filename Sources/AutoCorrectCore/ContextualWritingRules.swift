@@ -24,6 +24,7 @@ public enum ContextualWritingRules {
     // These variants can be dictionary words ("leets") or damaged contractions.
     // Only invitation contexts permit changing them; an isolated token is ambiguous.
     private static let invitationForms: Set<String> = ["lets", "leets", "letts", "leats", "ltes"]
+    private static let invitationModifiers: Set<String> = ["all", "just", "not", "also"]
     private static let possessionNouns: Set<String> = [
         "color", "colour", "size", "shape", "name", "owner", "price", "surface",
         "battery", "screen", "weight", "height", "width", "length"
@@ -135,9 +136,9 @@ public enum ContextualWritingRules {
                     automatic = hasPredicate
                     explanation = "This context may describe something belonging to it; possessive ‘its’ has no apostrophe."
                 }
-            } else if invitationForms.contains(normalized), startsClause(at: range.location, in: text) {
-                let verb = ["all", "just", "not", "also"].contains(after[0]) && after.count >= 2 ? after[1] : after[0]
-                if invitationVerbs.contains(verb) {
+            } else if invitationForms.contains(normalized),
+                      startsClause(at: range.location, in: text) || continuesInvitation(at: range.location, in: text) {
+                if let verb = after.drop(while: invitationModifiers.contains).first, invitationVerbs.contains(verb) {
                     replacement = "let's"
                     automatic = true
                     explanation = "This may be an invitation meaning ‘let us’; use ‘let's’ for that contraction."
@@ -181,6 +182,47 @@ public enum ContextualWritingRules {
         "yes", "yeah", "yep", "no", "nope", "sure", "fine", "oh", "hmm", "hey", "hi", "thanks",
         "anyway", "also", "first", "next", "otherwise", "cool", "great", "perfect", "nice", "awesome"
     ]
+
+    /// A conjunction alone is insufficient: "she takes the rope and lets go" is valid.
+    /// Require an earlier clause-opening invitation and reject embedded subject clauses.
+    /// This deliberately abstains on complex syntax rather than trying to parse English.
+    private static func continuesInvitation(at offset: Int, in text: NSString) -> Bool {
+        let prefix = text.substring(to: offset)
+        let clause = prefix.components(separatedBy: CharacterSet(charactersIn: ".!?\n")).last ?? prefix
+        let plain = clause.replacingOccurrences(of: "’", with: "'")
+        guard plain.allSatisfy({ $0.isASCII && ($0.isLetter || " ',".contains($0)) }) else { return false }
+        let tokens = plain.lowercased().replacingOccurrences(of: ",", with: " ")
+            .split(separator: " ").map(String.init)
+        guard let connector = tokens.lastIndex(where: { ["and", "but", "or"].contains($0) }),
+              connector > 0, tokens.count - connector - 1 <= 3,
+              tokens[(connector + 1)...].allSatisfy(discourseWords.contains) else { return false }
+        let before = Array(tokens[..<connector])
+        guard let opening = before.firstIndex(where: { $0 == "let's" || $0 == "let" || invitationForms.contains($0) }),
+              opening <= 3, before[..<opening].allSatisfy(discourseWords.contains) else { return false }
+        var body = before.dropFirst(opening + 1)
+        if before[opening] == "let" {
+            guard body.first == "us" else { return false }
+            body = body.dropFirst()
+        }
+        body = body.drop(while: invitationModifiers.contains)
+        guard let verb = body.first, invitationVerbs.contains(verb) else { return false }
+        // These verbs can introduce a subject without "that": "Let's say Alice
+        // waits and lets go". Only their short, unambiguous object forms qualify.
+        if ["see", "say", "check", "read", "write"].contains(verb), body.count > 1 {
+            guard body.count == 2, ["it", "this"].contains(body.last!) else { return false }
+        }
+        // "Let's see how she waits and lets go" belongs to the embedded subject.
+        let embeddedClauseCues: Set<String> = [
+            "he", "she", "it", "they", "who", "whom", "whose", "which", "that",
+            "how", "what", "where", "why", "whether", "if", "when", "while",
+            "because", "although", "unless", "until", "since", "and", "but", "or"
+        ]
+        // A final object "it" immediately after the invitation verb is common ("read it").
+        // With more words it can introduce a subject ("see it stops"); abstain there.
+        return !body.dropFirst().enumerated().contains { index, word in
+            embeddedClauseCues.contains(word) && !(word == "it" && index == 0 && body.count == 2)
+        }
+    }
 
     private static func startsClause(at offset: Int, in text: NSString) -> Bool {
         let prefix = text.substring(to: offset).trimmingCharacters(in: CharacterSet(charactersIn: " ([\"“«{"))

@@ -48,9 +48,16 @@ Then open **AutoCorrect** from **Applications** and follow steps 3–4 above. Th
 
 **This is an early release.** App compatibility varies; it cannot correct text in every app or field. See [validation and known limits](docs/VALIDATION.md).
 
-## Current source: 0.3.10
+## Current source: 0.3.13
 
-The download button and Homebrew install the published **0.3.7 preview**. Versions 0.3.8–0.3.10 below describe source improvements that are not yet published as release downloads. Build from source to use them.
+The download button and Homebrew install the published **0.3.7 preview**. Versions 0.3.8–0.3.13 below describe source improvements that are not yet published as release downloads. Build from source to use them.
+
+- Contextual invitations now include “Let's improve this and lets work” → “Let's improve this and let's work,” while third-person uses such as “she grabs the rope and lets go” stay unchanged. A completed following verb is required; isolated `lets` remains ambiguous.
+- Local sentence suggestions, continued-typing Undo, weekday/product casing, and repairs for fresh-field typing and Unicode from 0.3.11–0.3.12. Grammar suggestions still require review.
+- Build and release versions share the bundle metadata. Stable-release preflight checks Developer ID and notarization credentials; custom output folders are used consistently through packaging.
+- [1.0 acceptance checklist](docs/RELEASE-READINESS.md) tracks the remaining accuracy, real-typing and download checks.
+
+### Earlier 0.3.10 improvements
 
 - Immediate first-letter capitalization in verified empty multi-line text fields, with approval mode, continued-typing undo and user overrides preserved.
 - Completed product names recover their canonical casing after automatic capitalization; canceled edits retain enough context to retry safely, and custom replacements take priority.
@@ -126,8 +133,8 @@ The build script compiles **arm64 and x86_64**, combines them into a universal e
 
 ```text
 dist/AutoCorrect.app
-dist/AutoCorrect-0.3.10-universal.zip
-dist/AutoCorrect-0.3.10-universal.zip.sha256
+dist/AutoCorrect-0.3.13-universal.zip
+dist/AutoCorrect-0.3.13-universal.zip.sha256
 ```
 
 It can be called from any working directory. The installer uses `/Applications` when writable, otherwise `~/Applications`. Use `--user` to choose `~/Applications`, `--no-open` to install without launching, and `--replace` to replace an existing installation. Quit AutoCorrect before replacing it; the installer preserves the previous bundle alongside the new one.

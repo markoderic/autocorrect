@@ -2,7 +2,9 @@
 # Notarize an already Developer ID-signed build. Never changes downloaded customer apps or bypasses Gatekeeper.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP="$ROOT/dist/AutoCorrect.app"
+DIST_DIR="${DIST_DIR:-$ROOT/dist}"
+[[ "$DIST_DIR" = /* ]] || DIST_DIR="$PWD/$DIST_DIR"
+APP="$DIST_DIR/AutoCorrect.app"
 : "${NOTARY_PROFILE:?Set NOTARY_PROFILE to an existing notarytool keychain profile.}"
 [[ -d "$APP" ]] || { echo "error: build AutoCorrect.app first." >&2; exit 1; }
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")"
@@ -21,10 +23,10 @@ SIGNATURE="$(codesign -d --verbose=4 "$STAGING/AutoCorrect.app" 2>&1)"
 ditto -c -k --sequesterRsrc --keepParent "$STAGING/AutoCorrect.app" "$STAGING/submission.zip"
 # No passwords are placed in shell arguments or stored in the repository.
 xcrun notarytool submit "$STAGING/submission.zip" --keychain-profile "$NOTARY_PROFILE" --wait --output-format plist > "$STAGING/result.plist"
-mkdir -p "$ROOT/dist/notarization"
-cp "$STAGING/result.plist" "$ROOT/dist/notarization/$VERSION.plist"
+mkdir -p "$DIST_DIR/notarization"
+cp "$STAGING/result.plist" "$DIST_DIR/notarization/$VERSION.plist"
 STATUS="$(/usr/libexec/PlistBuddy -c 'Print :status' "$STAGING/result.plist")"
-[[ "$STATUS" == "Accepted" ]] || { echo "error: Apple returned $STATUS. See dist/notarization/$VERSION.plist; no release archive was replaced." >&2; exit 1; }
+[[ "$STATUS" == "Accepted" ]] || { echo "error: Apple returned $STATUS. See $DIST_DIR/notarization/$VERSION.plist; no release archive was replaced." >&2; exit 1; }
 xcrun stapler staple "$STAGING/AutoCorrect.app"
 xcrun stapler validate "$STAGING/AutoCorrect.app"
 codesign --verify --strict "$STAGING/AutoCorrect.app"
@@ -36,10 +38,11 @@ ditto -c -k --sequesterRsrc --keepParent "$STAGING/AutoCorrect.app" "$STAGING/$Z
 # Verify what customers will extract, not only the pre-archive bundle.
 mkdir "$STAGING/extracted"
 ditto -x -k "$STAGING/$ZIP" "$STAGING/extracted"
+codesign --verify --strict "$STAGING/extracted/AutoCorrect.app"
 xcrun stapler validate "$STAGING/extracted/AutoCorrect.app"
 spctl --assess --type execute --verbose=2 "$STAGING/extracted/AutoCorrect.app"
 rm -rf "$APP"
 mv "$STAGING/AutoCorrect.app" "$APP"
-mv "$STAGING/$ZIP" "$ROOT/dist/$ZIP"
-mv "$STAGING/$ZIP.sha256" "$ROOT/dist/$ZIP.sha256"
-echo "Notarized and Gatekeeper-verified: $ROOT/dist/$ZIP"
+mv "$STAGING/$ZIP" "$DIST_DIR/$ZIP"
+mv "$STAGING/$ZIP.sha256" "$DIST_DIR/$ZIP.sha256"
+echo "Notarized and Gatekeeper-verified: $DIST_DIR/$ZIP"

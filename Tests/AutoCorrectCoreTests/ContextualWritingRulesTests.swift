@@ -2,6 +2,35 @@ import XCTest
 @testable import AutoCorrectCore
 
 final class ContextualWritingRulesTests: XCTestCase {
+    func testCoordinatedInvitations() throws {
+        for text in ["Let's improve this and lets work ", "Let’s read it and then lets discuss ",
+                     "Let us check it but lets not change ", "Okay lets try this or lets just stop ",
+                     "Let's go and lets all just try ", "Done. Let's read and lets write ",
+                     "🙂 Done. Let's read and lets write "] {
+            let candidate = try XCTUnwrap(ContextualWritingRules.candidate(in: text), text)
+            XCTAssertEqual(candidate.original, "lets", text)
+            XCTAssertEqual(candidate.replacement, "let's", text)
+            XCTAssertTrue(candidate.automatic, text)
+            XCTAssertEqual((text as NSString).substring(with: candidate.range), "lets", text)
+        }
+    }
+
+    func testCoordinationDoesNotRewriteThirdPersonVerbsOrStructuredText() {
+        for text in ["She grabs the rope and lets go ", "The app saves and lets go ",
+                     "Let's see how she stops and lets go ", "Let's see if he waits and lets go ",
+                     "Let's see it stops and lets go ",
+                     "Let's say Alice waits and lets go ", "Let's see Alice stops and lets go ",
+                     "Let's read and Alice stops and lets go ",
+                     "Let's use the app that saves and lets go ", "Let's read. She waits and lets go ",
+                     "Let's read and she lets go ", "They said let's read and lets go ",
+                     "Let's inspect `and lets go ", "Let's inspect path/and lets go ",
+                     "Let's read and lets users work ", "Let's read and lets just ",
+                     "Let's read and lets work_file ", "Let's read and lets work123 ",
+                     "Let's read and lets work", "Let's read and LETS work "] {
+            XCTAssertNil(ContextualWritingRules.candidate(in: text), text)
+        }
+    }
+
     func testAmbiguousTypoUsesCompletedDeadlineOrPurchaseContext() {
         for text in ["lets do that byu this date ", "Let's finish it byu the deadline ",
                      "Let’s send them byu that time ", "please review this byu this evening "] {

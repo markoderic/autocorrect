@@ -79,6 +79,35 @@ final class InvitationSequenceTests: XCTestCase {
         XCTAssertEqual(host.text, "No let's do it in Claude ")
     }
 
+    func testCoordinatedInvitationsTypedSlowlyAndQuickly() {
+        for fast in [false, true] {
+            engine.invalidate(); host.text = "Let's improve this and "
+            if fast { typeFast("lets work through it ") }
+            else { type("lets work through it ") }
+            XCTAssertEqual(host.text, "Let's improve this and let's work through it ")
+        }
+    }
+
+    func testCoordinatedInvitationRespectsPreferencesAndIgnoredWords() {
+        let text = "Let's improve this and lets work "
+        preferences.ignoredWords = ["lets"]
+        XCTAssertNil(engine.contextualCandidate(in: text))
+        preferences.ignoredWords = []
+        preferences.customCorrections = ["lets": "custom"]
+        XCTAssertNil(engine.contextualCandidate(in: text))
+        preferences.customCorrections = [:]
+        preferences.checksContext = false
+        XCTAssertNil(engine.contextualCandidate(in: text))
+    }
+
+    func testCoordinatedVerbRemainsIntactDuringTyping() {
+        for prefix in ["She grabs the rope and ", "Let's see how she waits and "] {
+            engine.invalidate(); host.text = prefix
+            type("lets go ")
+            XCTAssertEqual(host.text, prefix + "lets go ")
+        }
+    }
+
     func testSentenceStartsAndDiscourseOpeners() {
         type("lets go ")
         XCTAssertEqual(host.text, "Let's go ", "field start: capitalized and contracted")

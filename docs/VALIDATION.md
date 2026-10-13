@@ -1,3 +1,13 @@
+# 0.3.13 contextual accuracy and release preparation — October 12, 2026
+
+- Coordinated invitations now repair `Let's improve this and lets work ` and `Let us check it but lets not change `; two modifiers also work (`lets all just go `). Third-person verbs, embedded subject clauses, structured tokens, incomplete words, ignored words, explicit replacements and context-off are protected by regression tests. This remains bounded syntax, not general grammar understanding.
+- Before the fix: the new targeted suite failed in two test methods (three assertions), including slow and fast engine typing. After final review: **358 Swift tests executed, 356 passed, two gated evaluations skipped, zero failures**. Six release-orchestration tests also pass with fake signing services; they do not constitute notarization.
+- Stable release preflight verifies the installed Developer ID identity and authenticates the local notary profile before building. Build/release default versions derive from the bundle plist. `DIST_DIR` flows through submission, stapling, final archive verification and checksum. Extracted archives receive an explicit strict signature check.
+- Current certificate inventory: Apple Development only. No Developer ID certificate, Apple Accepted submission, stapled ticket or successful public Gatekeeper launch is claimed. Public v0.3.7 and its cask remain unchanged.
+- Universal build, installation, GitHub commit and hosted CI evidence are recorded in the latest [work log](WORK-LOG.md). Real physical typing, broader independent sentence accuracy and clean-Mac download testing remain open; use the [1.0 checklist](RELEASE-READINESS.md).
+
+---
+
 # 0.3.12 independent review and distribution — October 5, 2026
 
 Source review/local verification passed and 0.3.12 is installed under the owner's standing authorization. Runtime commit `410b6f2` is pushed. Hosted [CI 37396738542](https://github.com/markoderic/autocorrect/actions/runs/37396738542) passed tests (353 executed/351 passed/two skips), universal build and artifact upload on its first attempt. This section supersedes the earlier review blockers below.

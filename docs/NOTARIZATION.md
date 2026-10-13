@@ -12,24 +12,45 @@ For existing trusted previews, see [Apple's first-open instructions](https://sup
 
 On September 29, 2026, the development Mac had only an Apple Development signing identity. There were no repository signing secrets. No notarization submission or successful Gatekeeper assessment is claimed for 0.3.7.
 
+## Current setup — October 12, 2026
+
+The owner reports an existing Apple Developer account with an App Store app. That membership can be used for Developer ID distribution if active and the account has the required Account Holder role. The Mac currently has only an **Apple Development** identity; App Store distribution and Developer ID Application are different certificate types.
+
+Create a **Developer ID Application** certificate through Xcode's account certificate manager or [Apple's certificate portal instructions](https://developer.apple.com/help/account/certificates/create-developer-id-certificates/). Use the existing account; no second membership is needed. Creating a certificate in Xcode keeps its private key on this Mac. If importing an existing certificate, it also needs its corresponding private key. Do not revoke existing App Store or development certificates.
+
+Then store a notarization profile interactively in Terminal:
+
+```sh
+xcrun notarytool store-credentials AutoCorrect-notary
+```
+
+Follow the local prompts for the account/team and an app-specific password (or use an existing authorized API-key profile). Never paste credentials in chat or source. Verify the setup without building or submitting anything:
+
+```sh
+SIGNING_IDENTITY='Developer ID Application: YOUR NAME (TEAMID)' \
+NOTARY_PROFILE='AutoCorrect-notary' ./scripts/release.sh --check
+```
+
+This verifies that the identity/private key is locally available and authenticates with Apple's read-only notarization history endpoint. It cannot establish that a future upload will be accepted.
+
 ## Build a notarized release
 
 ```sh
 swift test --build-system native
-VERSION=0.3.9 \
+VERSION=0.3.13 \
 SIGNING_IDENTITY='Developer ID Application: YOUR NAME (TEAMID)' \
 NOTARY_PROFILE='your-existing-keychain-profile' \
 ./scripts/release.sh
 ```
 
-The stable path requires the correct identity and credentials before building. `build.sh` enables hardened runtime and a secure timestamp for Developer ID signatures. `notarize.sh` verifies the signature, stages a copy, submits it to Apple, requires **Accepted**, staples the ticket, and runs Gatekeeper assessment. It then archives and extracts the final download and verifies the extracted app again before replacing the outputs. Rejection leaves the prior bundle/archive untouched. Submission results are in ignored `dist/notarization/`.
+The stable path checks the installed identity and authenticates credentials before building. The default version comes from `Resources/Info.plist`; `VERSION` can override it. `DIST_DIR` selects the same output folder for build, notarization results, final archive and checksum. Use a separate folder such as `DIST_DIR="$PWD/dist/notarized"` to preserve the local development build. `build.sh` enables hardened runtime and a secure timestamp for Developer ID signatures. `notarize.sh` verifies the signature, stages a copy, submits it to Apple, requires **Accepted**, staples the ticket, and runs Gatekeeper assessment. It then archives and extracts the final download and verifies the extracted app again before replacing the outputs. Rejection leaves the prior bundle/archive untouched. Submission results are in ignored `dist/notarization/`.
 
 Only then update the Homebrew cask with the final ZIP checksum, upload that exact ZIP and checksum to GitHub, and label the release notarized. A checksum from before stapling is not valid for the final artifact. Public first launch still needs validation on a separate Mac with a quarantined browser download, including an offline launch using the stapled ticket.
 
 ## Explicit preview builds
 
 ```sh
-RELEASE_CHANNEL=preview VERSION=0.3.9 ./scripts/release.sh
+RELEASE_CHANNEL=preview VERSION=0.3.13 ./scripts/release.sh
 ```
 
 This deliberately creates an **unnotarized preview**, which must be labeled as such. Ordinary CI runs tests and `build.sh`; they are not notarized releases. No script publishes automatically.

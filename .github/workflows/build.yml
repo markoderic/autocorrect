@@ -14,6 +14,8 @@ jobs:
         run: swift --version
       - name: Tests
         run: swift test --build-system native
+      - name: Release orchestration checks (no signing or submission)
+        run: python3 Tests/ReleaseScripts/test_release.py
       - name: Fixed dictionary diagnostics on failure
         if: failure()
         run: swift scripts/diagnose-spelling.swift

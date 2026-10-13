@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
-VERSION="${VERSION:-0.3.12}"
+VERSION="${VERSION:-$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$ROOT/Resources/Info.plist")}"
 SIGNING_IDENTITY="${SIGNING_IDENTITY:--}"
 # DIST_DIR lets a development build land somewhere other than dist/ so it cannot
 # replace a recorded archive there (e.g. DIST_DIR="$PWD/dist/dev"). Default unchanged.
