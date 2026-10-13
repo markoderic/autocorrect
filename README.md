@@ -4,18 +4,18 @@ Autocorrect that keeps up with your typing. A small Mac menu bar app that fixes 
 
 ## Download and install
 
-<a href="https://github.com/markoderic/autocorrect/releases/download/v0.3.7/AutoCorrect-0.3.7-universal.zip"><img src="docs/media/download-macos.svg" alt="Download AutoCorrect for macOS" width="296" height="56"></a>
+<a href="https://github.com/markoderic/autocorrect/releases/download/v0.3.14/AutoCorrect-0.3.14-universal.zip"><img src="docs/media/download-macos.svg" alt="Download AutoCorrect for macOS" width="296" height="56"></a>
 
-[Download ZIP](https://github.com/markoderic/autocorrect/releases/download/v0.3.7/AutoCorrect-0.3.7-universal.zip) · **macOS 13 or later** · Apple silicon and Intel · [v0.3.7 preview](https://github.com/markoderic/autocorrect/releases/tag/v0.3.7)
+[Download ZIP](https://github.com/markoderic/autocorrect/releases/download/v0.3.14/AutoCorrect-0.3.14-universal.zip) · **macOS 13 or later** · Apple silicon and Intel · [v0.3.14 notarized preview](https://github.com/markoderic/autocorrect/releases/tag/v0.3.14)
 
-**Preview installation notice:** Apple has not notarized this download yet. If you see **“Apple cannot check it for malicious software,”** that is the known first-launch limitation described below. Homebrew installs the same unnotarized build. [Signing status and release process](docs/NOTARIZATION.md).
+**Signed and Apple notarized.** This download includes a Developer ID signature and Apple's notarization ticket. It passes Gatekeeper verification. macOS may still show its normal “downloaded from the Internet” confirmation. [Signing details](docs/NOTARIZATION.md).
 
 1. **Download** using the button above, then double-click the ZIP to unzip it.
 2. **Drag AutoCorrect.app into Applications**, then open it from there.
 3. **Allow Accessibility and Input Monitoring** when prompted. Find both under **System Settings → Privacy & Security**. Quit and reopen AutoCorrect after allowing them.
 4. **Start typing.** Look for AutoCorrect in your menu bar to change settings or pause it.
 
-**If macOS blocks the first launch:** this preview is not Apple notarized. After trying to open it, go to **System Settings → Privacy & Security → Open Anyway** for AutoCorrect, if you trust this release. [Apple’s first-open instructions](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/mac).
+**Updating from an old preview?** Download the new ZIP above and replace the old app in Applications. Versions through the previously published 0.3.7 download were unnotarized. If a new download is blocked, confirm it is 0.3.14 and report the exact alert; this release does not require disabling Gatekeeper.
 
 ### Prefer Homebrew? Two commands
 
@@ -48,9 +48,13 @@ Then open **AutoCorrect** from **Applications** and follow steps 3–4 above. Th
 
 **This is an early release.** App compatibility varies; it cannot correct text in every app or field. See [validation and known limits](docs/VALIDATION.md).
 
-## Current source: 0.3.13
+## Current release: 0.3.14
 
-The download button and Homebrew install the published **0.3.7 preview**. Versions 0.3.8–0.3.13 below describe source improvements that are not yet published as release downloads. Build from source to use them.
+The download button and Homebrew install the **0.3.14 notarized preview**, including the source improvements from 0.3.8–0.3.13.
+
+- Fewer harmful automatic guesses, protection for unfamiliar names and valid regional spellings, and more conservative handling of ambiguous words. On the current regression corpus, wrong replacements fell 186→96, while exact fixes fell 3,521→3,400 and misses rose 375→586.
+- More reliable sentence suggestions: quotations and exact error strings are protected; unsupported paraphrases are rejected; narrow grammar rules and safe punctuation anchors improve coverage. Eligible grammar fixes rose 17→26/65 and punctuation fixes 2→10/42 on the existing corpus. These are separate subsystem measurements, not overall English accuracy.
+- [Full measurements, tradeoffs and remaining gaps](docs/ACCURACY-IMPROVEMENTS-0.3.14.md).
 
 - Contextual invitations now include “Let's improve this and lets work” → “Let's improve this and let's work,” while third-person uses such as “she grabs the rope and lets go” stay unchanged. A completed following verb is required; isolated `lets` remains ambiguous.
 - Local sentence suggestions, continued-typing Undo, weekday/product casing, and repairs for fresh-field typing and Unicode from 0.3.11–0.3.12. Grammar suggestions still require review.
@@ -68,7 +72,7 @@ The download button and Homebrew install the published **0.3.7 preview**. Versio
 
 - **Persistent spelling underlines.** Unresolved misspellings stay marked while you keep typing; several words can be marked at once; a mark disappears only when its word is corrected, deleted, ignored or deliberately retyped. Existing text around the caret is checked when a field gains focus, after pasting, scrolling or edits, within documented bounds, and is never rewritten automatically. Contextual grammar doubts (`its`/`it's`) are indicated in the menu but not underlined. Marks follow window moves and resizes, hide while a view scrolls and return afterwards, disappear when you switch apps, and clear predictably when the toggle is turned off. The menu reports how many marks are shown and how many could not be drawn because the editor exposes no trustworthy geometry.
 - **Automatic correction unchanged** from the unpublished 0.3.8 work, which is included here: fewer wrong replacements through letter-preserving repairs, joined phrases never replaced by unrelated words, more contractions, verified corrections in rich editors, and the held-out evaluation harness. See the 0.3.8 notes in [docs/releases](docs/releases/).
-- **Still unnotarized.** The first-launch caveat above is unchanged.
+- **Historical distribution status:** 0.3.9 was not notarized. The current 0.3.14 download is notarized.
 
 ## What changed in 0.3.8
 
@@ -77,7 +81,7 @@ The download button and Homebrew install the published **0.3.7 preview**. Versio
 - **More contractions:** `hes`, `shes`, `itll`, `youd`, `theyd`, `wouldve`, `couldve`, `shouldve`, `aint`, `yall`, `oclock`, `wheres`, `whens` and others are repaired even when macOS offers no automatic recommendation. Damaged forms of other words are no longer bent into contractions (`heros` stays for review instead of becoming `here's`).
 - **Rich editors:** corrections that insert an apostrophe or quote are verified correctly when Notes, TextEdit, Mail or Messages convert it to a curly one, so undo and the respect-my-rewrite protection keep working there. Confirmed with a traced build in TextEdit, Notes and the ChatGPT desktop app; see [validation](docs/VALIDATION.md).
 - **Evaluation harness:** `evaluation/` holds a pinned, licensed corpus and a gated test that reports correct repairs, misses, false corrections and abstentions separately, plus a simulator for trying candidate rules against recorded native signals.
-- **Still unnotarized.** The first-launch caveat above is unchanged.
+- **Historical distribution status:** 0.3.9 was not notarized. The current 0.3.14 download is notarized.
 
 [Validation and remaining 1.0 gates](docs/VALIDATION.md) · [Signing details](docs/NOTARIZATION.md).
 
@@ -133,8 +137,8 @@ The build script compiles **arm64 and x86_64**, combines them into a universal e
 
 ```text
 dist/AutoCorrect.app
-dist/AutoCorrect-0.3.13-universal.zip
-dist/AutoCorrect-0.3.13-universal.zip.sha256
+dist/AutoCorrect-0.3.14-universal.zip
+dist/AutoCorrect-0.3.14-universal.zip.sha256
 ```
 
 It can be called from any working directory. The installer uses `/Applications` when writable, otherwise `~/Applications`. Use `--user` to choose `~/Applications`, `--no-open` to install without launching, and `--replace` to replace an existing installation. Quit AutoCorrect before replacing it; the installer preserves the previous bundle alongside the new one.

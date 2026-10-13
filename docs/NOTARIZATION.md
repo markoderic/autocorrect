@@ -1,8 +1,8 @@
-# Warning-free Mac distribution
+# Signed and notarized Mac distribution
 
-The current preview is not notarized. “Apple cannot check it for malicious software” means the downloaded build has not passed the Developer ID/notarization distribution path. Installing through Homebrew does not change that fact. The app's Accessibility and Input Monitoring permissions are separate from this first-launch check.
+The public **0.3.14 preview is Developer ID signed and Apple notarized**. Its browser-downloaded ZIP matches the published checksum; the extracted app passes Gatekeeper with browser quarantine retained. This addresses the older preview's “Apple cannot check it for malicious software” block. Accessibility and Input Monitoring permissions remain separate.
 
-For existing trusted previews, see [Apple's first-open instructions](https://support.apple.com/en-us/102445). Users who do not want to override the warning should wait for a notarized release. Do not disable Gatekeeper or remove quarantine as an installation step.
+Download the [new release](https://github.com/markoderic/autocorrect/releases/tag/v0.3.14) rather than reusing an old ZIP. macOS can still ask whether to open an app downloaded from the Internet; see [Apple's explanation](https://support.apple.com/en-us/102445). Do not disable Gatekeeper or remove quarantine as an installation step. Another-Mac first launch remains to be checked.
 
 ## Maintainer prerequisites
 
@@ -12,9 +12,13 @@ For existing trusted previews, see [Apple's first-open instructions](https://sup
 
 On September 29, 2026, the development Mac had only an Apple Development signing identity. There were no repository signing secrets. No notarization submission or successful Gatekeeper assessment is claimed for 0.3.7.
 
-## Current setup — October 12, 2026
+## Current setup — October 13, 2026
 
-The owner reports an existing Apple Developer account with an App Store app. That membership can be used for Developer ID distribution if active and the account has the required Account Holder role. After explicit owner approval, Xcode created **Developer ID Application: Marko Deric (B376DM5LNP)** on October 12. The local signing identity/private key is valid; the existing Apple Development identity is preserved. App Store distribution and Developer ID Application are different certificate types. A separate 0.3.13 build in `dist/developer-id/` is Developer ID signed with hardened runtime and a secure timestamp; its extracted ZIP passes strict signature and both architecture checks. The owner saved the local notarization profile and preflight authentication passed. Apple submission `6be10b1c-e7d6-48d0-abcf-29e29c257104` was uploaded at 23:59 EDT on October 12 and remains **In Progress** at the latest check. It is not yet notarized.
+The owner's existing Developer Program account provides **Developer ID Application: Marko Deric (B376DM5LNP)**. Its private key and the authorized `AutoCorrect-notary` profile remain in the local Keychain. Existing Apple Development/App Store certificates are preserved.
+
+**0.3.14 is signed and notarized.** Submission `b7fb4e72-7e04-4cc5-9a5f-285974c01ab3` is Accepted. Its ticket is stapled; the final extracted ZIP passes strict signature, both architectures, Gatekeeper (`Notarized Developer ID`) and `syspolicy_check distribution`. SHA-256: `5aaadc913aa7c050683d1d5943944c1a4de5ed0fd572756841381cdbfec51898`. Public release: [v0.3.14](https://github.com/markoderic/autocorrect/releases/tag/v0.3.14). It remains a preview for accuracy/compatibility, independent of notarization status.
+
+The earlier local 0.3.13 submission `6be10b1c-e7d6-48d0-abcf-29e29c257104` was also Accepted; it was not published. The installed development signature is retained to preserve permissions. Public downloads use the separate Developer ID archive. A clean browser download and first launch on another Mac still need user verification.
 
 Create a **Developer ID Application** certificate through Xcode's account certificate manager or [Apple's certificate portal instructions](https://developer.apple.com/help/account/certificates/create-developer-id-certificates/). Use the existing account; no second membership is needed. Creating a certificate in Xcode keeps its private key on this Mac. If importing an existing certificate, it also needs its corresponding private key. Do not revoke existing App Store or development certificates.
 
@@ -37,7 +41,7 @@ This verifies that the identity/private key is locally available and authenticat
 
 ```sh
 swift test --build-system native
-VERSION=0.3.13 \
+VERSION=0.3.14 \
 SIGNING_IDENTITY='Developer ID Application: YOUR NAME (TEAMID)' \
 NOTARY_PROFILE='your-existing-keychain-profile' \
 ./scripts/release.sh
@@ -50,9 +54,23 @@ Only then update the Homebrew cask with the final ZIP checksum, upload that exac
 ## Explicit preview builds
 
 ```sh
-RELEASE_CHANNEL=preview VERSION=0.3.13 ./scripts/release.sh
+RELEASE_CHANNEL=preview VERSION=0.3.14 ./scripts/release.sh
 ```
 
 This deliberately creates an **unnotarized preview**, which must be labeled as such. Ordinary CI runs tests and `build.sh`; they are not notarized releases. No script publishes automatically.
 
 References: [Apple Developer ID](https://developer.apple.com/developer-id/), [notarization workflow](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution/customizing-the-notarization-workflow), [distribution requirements](https://help.apple.com/xcode/mac/current/en.lproj/dev88332a81e.html).
+
+## View this submission
+
+This is Apple notarization for direct distribution, not an App Store Connect app review. Query the status with the existing local Keychain profile:
+
+```sh
+xcrun notarytool info b7fb4e72-7e04-4cc5-9a5f-285974c01ab3 \
+  --keychain-profile AutoCorrect-notary
+
+# List this team's submissions:
+xcrun notarytool history --keychain-profile AutoCorrect-notary
+```
+
+The saved Apple response is `dist/release-0.3.14/notarization/0.3.14-log.json`: status **Accepted**, status summary **Ready for distribution**, issues **null**. No password belongs in these commands. A clean browser download/first launch on another Mac remains a separate release check.

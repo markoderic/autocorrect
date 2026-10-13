@@ -1,6 +1,6 @@
 cask "autocorrect" do
-  version "0.3.7"
-  sha256 "c4aca31312137dcc3f549d344968277c8d6aa097b8040e8263d0efa717df25ff"
+  version "0.3.14"
+  sha256 "5aaadc913aa7c050683d1d5943944c1a4de5ed0fd572756841381cdbfec51898"
 
   url "https://github.com/markoderic/autocorrect/releases/download/v#{version}/AutoCorrect-#{version}-universal.zip"
   name "AutoCorrect"
@@ -12,7 +12,7 @@ cask "autocorrect" do
 
   caveats <<~EOS
     AutoCorrect requires Accessibility and Input Monitoring permission.
-    This community build is not notarized. Review the project before granting
-    permissions, then use macOS Privacy & Security to approve opening it.
+    This preview is Developer ID signed and Apple notarized.
+    Review the project before granting typing-related permissions.
   EOS
 end
