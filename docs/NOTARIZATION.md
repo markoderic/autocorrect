@@ -1,8 +1,8 @@
 # Signed and notarized Mac distribution
 
-The public **0.3.15 preview is Developer ID signed and Apple notarized**. Its browser-downloaded ZIP matches the published checksum; the extracted app passes Gatekeeper with browser quarantine retained. This addresses the older preview's “Apple cannot check it for malicious software” block. Accessibility and Input Monitoring permissions remain separate.
+The public **0.3.16 preview is Developer ID signed and Apple notarized**. Its browser-downloaded ZIP matches the published checksum; the extracted app passes Gatekeeper with browser quarantine retained. This addresses the older preview's “Apple cannot check it for malicious software” block. Accessibility and Input Monitoring permissions remain separate.
 
-Download the [new release](https://github.com/markoderic/autocorrect/releases/tag/v0.3.15) rather than reusing an old ZIP. macOS can still ask whether to open an app downloaded from the Internet; see [Apple's explanation](https://support.apple.com/en-us/102445). Do not disable Gatekeeper or remove quarantine as an installation step. Another-Mac first launch remains to be checked.
+Download the [new release](https://github.com/markoderic/autocorrect/releases/tag/v0.3.16) rather than reusing an old ZIP. macOS can still ask whether to open an app downloaded from the Internet; see [Apple's explanation](https://support.apple.com/en-us/102445). Do not disable Gatekeeper or remove quarantine as an installation step. Another-Mac first launch remains to be checked.
 
 ## Maintainer prerequisites
 
@@ -12,11 +12,11 @@ Download the [new release](https://github.com/markoderic/autocorrect/releases/ta
 
 On September 29, 2026, the development Mac had only an Apple Development signing identity. There were no repository signing secrets. No notarization submission or successful Gatekeeper assessment is claimed for 0.3.7.
 
-## Current setup — October 13, 2026
+## Current setup — October 14, 2026
 
 The owner's existing Developer Program account provides **Developer ID Application: Marko Deric (B376DM5LNP)**. Its private key and the authorized `AutoCorrect-notary` profile remain in the local Keychain. Existing Apple Development/App Store certificates are preserved.
 
-**0.3.15 is signed and notarized.** Submission `fd209637-144a-481d-bb05-90d1eb0b000b` is Accepted. Its ticket is stapled; the final extracted ZIP passes strict signature, both architectures, Gatekeeper (`Notarized Developer ID`) and `syspolicy_check distribution`. SHA-256: `834f5a45862365af671d5b349ad94bc9c216cc110b4de9a282f10c099663e8c0`. Public release: [v0.3.15](https://github.com/markoderic/autocorrect/releases/tag/v0.3.15). It remains a preview for accuracy/compatibility, independent of notarization status.
+**0.3.16 is signed and notarized.** Submission `fc778dde-f7cf-498b-b14e-b5d55f661b71` is Accepted. Its ticket is stapled; the final extracted ZIP passes strict signature, both architectures, Gatekeeper (`Notarized Developer ID`) and `syspolicy_check distribution`. SHA-256: `0ed68a6a8f0a335d7ee979c1c6ec2c64733015b80f3ef30d864892763d073d9b`. Public release: [v0.3.16](https://github.com/markoderic/autocorrect/releases/tag/v0.3.16). It remains a preview for accuracy/compatibility, independent of notarization status.
 
 The earlier local 0.3.13 submission `6be10b1c-e7d6-48d0-abcf-29e29c257104` was also Accepted; it was not published. The installed development signature is retained to preserve permissions. Public downloads use the separate Developer ID archive. A clean browser download and first launch on another Mac still need user verification.
 
@@ -41,7 +41,7 @@ This verifies that the identity/private key is locally available and authenticat
 
 ```sh
 swift test --build-system native
-VERSION=0.3.15 \
+VERSION=0.3.16 \
 SIGNING_IDENTITY='Developer ID Application: YOUR NAME (TEAMID)' \
 NOTARY_PROFILE='your-existing-keychain-profile' \
 ./scripts/release.sh
@@ -54,7 +54,7 @@ Only then update the Homebrew cask with the final ZIP checksum, upload that exac
 ## Explicit preview builds
 
 ```sh
-RELEASE_CHANNEL=preview VERSION=0.3.15 ./scripts/release.sh
+RELEASE_CHANNEL=preview VERSION=0.3.16 ./scripts/release.sh
 ```
 
 This deliberately creates an **unnotarized preview**, which must be labeled as such. Ordinary CI runs tests and `build.sh`; they are not notarized releases. No script publishes automatically.
@@ -66,11 +66,11 @@ References: [Apple Developer ID](https://developer.apple.com/developer-id/), [no
 This is Apple notarization for direct distribution, not an App Store Connect app review. Query the status with the existing local Keychain profile:
 
 ```sh
-xcrun notarytool info fd209637-144a-481d-bb05-90d1eb0b000b \
+xcrun notarytool info fc778dde-f7cf-498b-b14e-b5d55f661b71 \
   --keychain-profile AutoCorrect-notary
 
 # List this team's submissions:
 xcrun notarytool history --keychain-profile AutoCorrect-notary
 ```
 
-The saved Apple response is `dist/release-0.3.15/notarization/0.3.15-log.json`: status **Accepted**, status summary **Ready for distribution**, issues **null**. No password belongs in these commands. A clean browser download/first launch on another Mac remains a separate release check.
+The saved Apple response is `dist/release-0.3.16/notarization/0.3.16-log.json`: status **Accepted**, status summary **Ready for distribution**, issues **null**. No password belongs in these commands. A clean browser download/first launch on another Mac remains a separate release check.
