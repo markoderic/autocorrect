@@ -321,7 +321,10 @@ final class CorrectionEngine {
     /// controls: it must not reset the typing session or hide the popup before the button acts.
     /// Everything else (editor clicks, scrolling) invalidates typing state, hides the overlays
     /// and redraws them once the view settles.
+    var isControlSurfacePoint: ((CGPoint) -> Bool)?
+
     func handleMouse(type: CGEventType, location: CGPoint) {
+        if type != .scrollWheel, isControlSurfacePoint?(location) == true { return }
         if type != .scrollWheel, popup.contains(quartzPoint: location) || suggestionPopup.contains(quartzPoint: location) {
             RuntimeDiagnostics.record("mouse inside popup")
             return
@@ -828,7 +831,7 @@ final class CorrectionEngine {
 
     func contextualCandidate(in text: String) -> ContextualWritingCandidate? {
         guard preferences.checksContext, preferences.language.lowercased().hasPrefix("en"),
-              let candidate = ContextualWritingRules.candidate(in: text) ?? uppercaseContractionCandidate(in: text),
+              let candidate = ContextualWritingRules.candidate(in: text) ?? ContextualOmissionRules.candidate(in: text) ?? uppercaseContractionCandidate(in: text),
               !preferences.ignoredWords.contains(UserDictionary.normalizedKey(candidate.original)),
               preferences.customCorrections[UserDictionary.normalizedKey(candidate.original)] == nil else { return nil }
         return candidate
@@ -1305,6 +1308,14 @@ final class CorrectionEngine {
             // Dictionary guesses can cover larger mistakes, but never apply them without approval.
             if let repair = confident, CorrectionPolicy.needsReviewForCompetingWords(word,
                 replacement: repair, native: proposed, guesses: guesses) { confident = nil }
+            if confident == nil, !preserveCompound, phrase == nil {
+                confident = KeyboardTypoPolicy.replacement(for: word, native: proposed, guesses: guesses,
+                    proximity: KeyboardMonitor.usesQWERTYLayout)
+                if confident == nil {
+                    confident = KeyboardTypoPolicy.pluralReplacement(for: word, native: proposed, guesses: guesses,
+                        prefix: (text as NSString).substring(to: wordRange.location), proximity: KeyboardMonitor.usesQWERTYLayout)
+                }
+            }
             // Unknown title-cased tokens inside prose may be personal names. A spell
             // checker suggesting another name is not authority to change someone's name.
             // Explicit custom/built-in/name-lexicon corrections were handled above.

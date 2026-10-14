@@ -56,7 +56,15 @@ final class SettingsController: NSWindowController, NSTableViewDataSource, NSTab
         window?.makeKeyAndOrderFront(nil)
     }
 
+    private var toggleControls: [Selector: NSButton] = [:]
+
     func updateStatus() {
+        let values: [(Selector, Bool)] = [
+            (#selector(setEnabled(_:)), preferences.enabled), (#selector(setApproval(_:)), preferences.asksBeforeCorrecting),
+            (#selector(setUnderlines(_:)), preferences.showsSpellingIndicators), (#selector(setPopup(_:)), preferences.showsCorrectionPopup),
+            (#selector(setGrammar(_:)), preferences.grammarSuggestions), (#selector(setPunctuation(_:)), preferences.punctuationSuggestions)
+        ]
+        for (action, value) in values { toggleControls[action]?.state = value ? .on : .off }
         liveStatus.stringValue = statusProvider?() ?? "Ready when you are"
     }
 
@@ -247,6 +255,7 @@ final class SettingsController: NSWindowController, NSTableViewDataSource, NSTab
     private func button(_ title: String, _ action: Selector) -> NSButton { NSButton(title: title, target: self, action: action) }
     private func toggle(_ title: String, value: Bool, action: Selector) -> NSButton {
         let control = NSButton(checkboxWithTitle: title, target: self, action: action); control.state = value ? .on : .off
+        toggleControls[action] = control
         return control
     }
     private func permissionRow(_ name: String, allowed: Bool, action: Selector) -> NSStackView {

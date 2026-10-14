@@ -7,6 +7,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private lazy var engine = CorrectionEngine(preferences: preferences)
     private var statusItem: NSStatusItem!
     private let menu = NSMenu()
+    private let quickPanel = MenuBarPanel()
+    private lazy var statusImage = AppIcon.menuImage()
     private var workspaceObserver: NSObjectProtocol?
     private var settings: SettingsController?
 
@@ -15,9 +17,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         NSApp.applicationIconImage = AppIcon.applicationImage()
         installMainMenu()
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        statusItem.menu = menu
+        statusItem.button?.target = self
+        statusItem.button?.action = #selector(openQuickPanel)
+        statusItem.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
+        engine.isControlSurfacePoint = { [weak self] point in self?.quickPanel.contains(quartz: point) ?? false }
         menu.delegate = self
-        engine.onChange = { [weak self] in self?.updateIcon(); self?.settings?.updateStatus() }
+        engine.onChange = { [weak self] in self?.updateIcon(); self?.settings?.updateStatus(); if let self { self.quickPanel.update(status: self.engine.status, count: self.engine.correctionCount) } }
         workspaceObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] _ in
             self?.engine.focusChanged()
             self?.updateIcon()
@@ -40,9 +45,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
+    @objc private func openQuickPanel() {
+        guard let button = statusItem.button else { return }
+        if quickPanel.isShown { quickPanel.close(); return }
+        if preferences.enabled && !engine.isRunning { engine.refresh() }
+        rebuildMenu()
+        if NSApp.currentEvent?.type == .rightMouseUp || NSApp.currentEvent?.type == .keyDown {
+            showFullMenu(); return
+        }
+        presentQuickControls(keyboardFocus: false)
+    }
+
+    @objc private func showQuickControls() { presentQuickControls(keyboardFocus: true) }
+
+    private func presentQuickControls(keyboardFocus: Bool) {
+        guard let button = statusItem.button else { return }
+        rebuildMenu()
+        quickPanel.show(relativeTo: button, menu: menu, status: engine.status, count: engine.correctionCount,
+                        enabled: preferences.enabled, keyboardFocus: keyboardFocus) { [weak self] in self?.showFullMenu() }
+    }
+
+    private func showFullMenu() {
+        guard let button = statusItem.button else { return }
+        quickPanel.close()
+        rebuildMenu()
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: -4), in: button)
+    }
+
     private func installMainMenu() {
         let main = NSMenu()
         let appItem = NSMenuItem(); let appMenu = NSMenu(title: "AutoCorrect")
+        let controls = NSMenuItem(title: "Quick Controls", action: #selector(showQuickControls), keyEquivalent: "")
+        controls.target = self; appMenu.addItem(controls)
         let settingsItem = NSMenuItem(title: "AutoCorrect Settings…", action: #selector(showSettings), keyEquivalent: ",")
         settingsItem.target = self; appMenu.addItem(settingsItem); appMenu.addItem(.separator())
         let quitItem = NSMenuItem(title: "Quit AutoCorrect", action: #selector(quit), keyEquivalent: "q")
@@ -64,7 +98,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func updateIcon() {
-        statusItem?.button?.image = AppIcon.menuImage()
+        statusItem?.button?.image = statusImage
         statusItem?.button?.title = engine.pending == nil ? "" : "•"
         statusItem?.button?.alphaValue = preferences.enabled ? 1 : 0.45
         statusItem?.button?.setAccessibilityLabel("AutoCorrect")
@@ -173,6 +207,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func showSettings() {
+        quickPanel.close()
         if settings == nil {
             let controller = SettingsController(preferences: preferences) { [weak self] in self?.engine.refresh() }
             controller.builtInReplacements = BuiltInReplacements.expansions.merging(BuiltInReplacements.casing) { _, product in product }

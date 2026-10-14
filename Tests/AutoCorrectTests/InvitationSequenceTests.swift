@@ -152,4 +152,52 @@ final class InvitationSequenceTests: XCTestCase {
         engine.debugTypeKey(nil, keyCode: 36)
         XCTAssertEqual(host.text, "Ok then lets go", "documented limitation: the final word before Return is never assessed")
     }
+    func testOmissionsPreserveFollowingTextAtSlowAndFastBoundaries() {
+        for fast in [false, true] {
+            for (input, expected) in [("wit that ", "with that "), ("the user wats to type ", "the user wants to type "),
+                                      ("the men bar ", "the menu bar "), ("os we can go ", "so we can go ")] {
+                preferences.capitalizesAfterPeriod = false
+                engine.invalidate(); host.text = ""
+                if fast {
+                    typeFast(input)
+                    for _ in 0..<8 { engine.processBoundaries(using: host.snapshot()) }
+                } else { type(input) }
+                type("next ")
+                XCTAssertEqual(host.text, expected + "next ", "fast=\(fast), \(input)")
+            }
+        }
+        preferences.capitalizesAfterPeriod = true
+        engine.invalidate(); host.text = ""
+        type("os we can go ")
+        XCTAssertEqual(host.text, "So we can go ")
+    }
+
+    func testNewContextRulesHonorOverridesAndCorrectWords() {
+        preferences.capitalizesAfterPeriod = false
+        for text in ["her sharp wit ", "a wit that delights ", "the men work ", "OS updates ", "os.path ", "its just working parts "] {
+            engine.invalidate(); host.text = ""
+            type(text)
+            XCTAssertEqual(host.text, text)
+        }
+        preferences.ignoredWords = ["wit", "os", "anyones"]
+        XCTAssertNil(engine.previewText(in: "wit that "))
+        XCTAssertNil(engine.previewText(in: "os we go "))
+        XCTAssertNil(engine.previewText(in: "anyones computer "))
+        preferences.ignoredWords = []
+        preferences.customCorrections = ["wit": "wit"]
+        XCTAssertNil(engine.contextualCandidate(in: "wit that "))
+        preferences.customCorrections = [:]
+        preferences.checksContext = false
+        XCTAssertNil(engine.contextualCandidate(in: "wit that "))
+    }
+
+    func testContextualOmissionManualRetypeIsRespected() {
+        preferences.capitalizesAfterPeriod = false
+        type("work wit that ")
+        XCTAssertEqual(host.text, "work with that ")
+        host.text = "work "
+        engine.debugDeleteKey()
+        type("wit that ")
+        XCTAssertEqual(host.text, "work wit that ")
+    }
 }

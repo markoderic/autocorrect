@@ -114,6 +114,14 @@ final class KeyboardMonitor {
         DispatchQueue.main.async { edit.completion(false) }
     }
 
+    /// Conservative layout gate: never assume QWERTY positions on Dvorak/AZERTY/IME.
+    static var usesQWERTYLayout: Bool {
+        guard let source = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue(),
+              let pointer = TISGetInputSourceProperty(source, kTISPropertyInputSourceID) else { return false }
+        let id = Unmanaged<CFString>.fromOpaque(pointer).takeUnretainedValue() as String
+        return ["com.apple.keylayout.US", "com.apple.keylayout.ABC", "com.apple.keylayout.British", "com.apple.keylayout.Australian"].contains(id)
+    }
+
     static var safeInputSource: Bool {
         guard !IsSecureEventInputEnabled(), let source = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue(),
               let pointer = TISGetInputSourceProperty(source, kTISPropertyInputSourceType) else { return false }

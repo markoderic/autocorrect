@@ -5,6 +5,8 @@ import Foundation
 public enum EnglishWritingRules {
     private static let contractions: [String: String] = [
         "im": "I'm", "ive": "I've",
+        "anyones": "anyone's", "someones": "someone's", "everyones": "everyone's",
+        "nobodys": "nobody's", "somebodys": "somebody's", "everybodys": "everybody's",
         "dont": "don't", "doesnt": "doesn't", "didnt": "didn't",
         "isnt": "isn't", "arent": "aren't", "wasnt": "wasn't", "werent": "weren't",
         "hasnt": "hasn't", "havent": "haven't", "hadnt": "hadn't",

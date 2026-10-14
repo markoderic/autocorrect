@@ -19,7 +19,7 @@ public enum ContextualWritingRules {
         "begin", "continue", "discuss", "create", "work", "meet", "eat", "see",
         "fix", "improve", "update", "add", "check", "test", "use", "do", "get",
         "keep", "take", "send", "run", "open", "close", "move", "count", "stop",
-        "change", "finish", "review", "download", "install", "publish", "say"
+        "change", "finish", "focus", "review", "download", "install", "publish", "say"
     ]
     // These variants can be dictionary words ("leets") or damaged contractions.
     // Only invitation contexts permit changing them; an isolated token is ambiguous.
@@ -41,7 +41,7 @@ public enum ContextualWritingRules {
         "clear", "obvious", "safe", "better", "worse", "hot", "cold", "nice"
     ]
     private static let predicateComplements: Set<String> = ["to", "for", "that", "because", "if", "when", "now", "today", "already", "again", "enough"]
-    private static let degreeAdverbs: Set<String> = ["really", "very", "quite", "pretty", "so", "too", "already", "still", "almost"]
+    private static let degreeAdverbs: Set<String> = ["really", "just", "very", "quite", "pretty", "so", "too", "already", "still", "almost"]
 
     /// A three-letter transposition can also contain an extra letter: "byu" can mean
     /// "buy" or "by". Do not let the isolated spelling pass decide before syntax arrives.
@@ -117,7 +117,7 @@ public enum ContextualWritingRules {
                 let completedPredicate = hasPredicate && (
                     (after.count == predicateIndex + 1 && tail.contains(where: { ".!?;:".contains($0) })) ||
                     (after.count > predicateIndex + 1 && predicateComplements.contains(after[predicateIndex + 1])))
-                if ["a", "an", "been", "not"].contains(after[0]) || after.starts(with: ["going", "to"]) || completedPredicate {
+                if after.count > predicateIndex && ["a", "an", "the", "been", "not"].contains(after[predicateIndex]) || after.starts(with: ["going", "to"]) || completedPredicate {
                     replacement = "it's"
                     explanation = "This context means ‘it is’ or ‘it has’; use ‘it's’ for that contraction."
                     automatic = true
