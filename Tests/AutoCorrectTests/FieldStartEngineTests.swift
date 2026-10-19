@@ -39,10 +39,11 @@ final class FieldStartEngineTests: XCTestCase {
         engine.lastProposal = nil
         engine.debugAppendKeys(keys)
         engine.processBoundaries(using: snapshot(text ?? keys, windowStart: windowStart, isTextArea: isTextArea))
-        return engine.lastProposal
+        return engine.lastProposal ?? engine.pending
     }
 
-    func testFirstLetterIsCapitalizedBeforeAnyDelimiter() {
+    func testFirstLetterCanBeOfferedForExplicitApprovalBeforeDelimiter() {
+        preferences.asksBeforeCorrecting = true
         let edit = typed("h")
         XCTAssertEqual(edit?.original, "h")
         XCTAssertEqual(edit?.replacement, "H")
@@ -55,7 +56,8 @@ final class FieldStartEngineTests: XCTestCase {
         XCTAssertEqual(typed("i")?.replacement, "I")
     }
 
-    func testImmediateCapitalizationRequiresGenuineFieldStartEvidence() {
+    func testEarlySuggestionRequiresGenuineFieldStartEvidence() {
+        preferences.asksBeforeCorrecting = true
         // Existing text before the caret, a window that does not start at the field, a
         // single-line control, failed length evidence, a capital, an ignored word, a
         // non-letter prefix or the feature being off: no edit, and no further reads.

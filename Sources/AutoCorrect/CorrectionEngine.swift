@@ -432,11 +432,11 @@ final class CorrectionEngine {
         if monitor.isRunning { status = "Ready" }
     }
 
-    private func resetTyping() {
+    private func resetTyping(afterBackspace: Bool = false) {
         cancelScheduled()
         sessionEpoch &+= 1
         inFlight = false
-        backlog.reset()
+        if afterBackspace { backlog.resetAfterBackspace() } else { backlog.reset() }
         attemptedBoundaries.removeAll()
         readAttempts = 0
         fieldStart = .unknown
@@ -445,11 +445,12 @@ final class CorrectionEngine {
     }
 
     /// A read is worth scheduling for the unfinished first word of a typing session only
-    /// while capitalization is on, the session has not been settled, the word is short and
-    /// at most three immediate edits have been handed to the keyboard path (a fast next
-    /// key invalidates an edit; the completed-word fallback still covers the word).
+    /// in explicit review mode. Automatic recasing waits for a word boundary:
+    /// deleting an unfinished first word can briefly empty a reactive editor and lose
+    /// the reinsertion. A pause after one letter must never cause a destructive edit.
     private var needsFieldStartCheck: Bool {
-        preferences.capitalizesAfterPeriod && fieldStart != .finished && fieldStartAttempts < 3
+        preferences.asksBeforeCorrecting && preferences.capitalizesAfterPeriod
+            && fieldStart != .finished && fieldStartAttempts < 3
             && backlog.isTypingFirstWord && backlog.typedSinceReset <= 32
     }
 
@@ -488,12 +489,17 @@ final class CorrectionEngine {
         if keyCode == 9, flags.contains(.maskCommand) { scheduleScan(delay: 600) }   // paste
         guard preferences.enabled, !flags.contains(.maskCommand), !flags.contains(.maskControl), !flags.contains(.maskAlternate),
               ![36, 48, 51, 53, 76, 115, 116, 117, 119, 121, 123, 124, 125, 126].contains(keyCode),
-              let text, TypingTypography.isSupportedKeystroke(text) else { resetTyping(); scheduleRender(delay: 300); return }
+              let text, TypingTypography.isSupportedKeystroke(text) else {
+            let plainBackspace = keyCode == 51 && flags.intersection([.maskCommand, .maskControl, .maskAlternate, .maskShift]).isEmpty
+            resetTyping(afterBackspace: plainBackspace)
+            scheduleRender(delay: 300)
+            return
+        }
         backlog.append(text)
         readAttempts = 0
         attemptedBoundaries = attemptedBoundaries.filter { entry in backlog.boundaries.contains { $0.id == entry.key } }
-        // A letter starting (or continuing) the first word of a session may need immediate
-        // capitalization; later letters retry an edit that a fast next key invalidated.
+        // Unfinished text may offer a capitalization suggestion in review mode only.
+        // Automatic mode waits for a completed boundary, even when the user pauses.
         guard pendingDeletionRestart || !backlog.boundaries.isEmpty || (needsFieldStartCheck && text.first?.isLowercase == true) else { return }
         scheduleCheck()
     }
@@ -632,8 +638,9 @@ final class CorrectionEngine {
         return true
     }
 
-    /// Immediate capitalization of the first letter typed into an empty prose area, before
-    /// a space or any other delimiter. The snapshot must hold nothing but optional leading
+    /// Optional review-mode suggestion for the first word of an empty prose area, before
+    /// a delimiter. Only an explicit approval may apply this unfinished-word edit.
+    /// The snapshot must hold nothing but optional leading
     /// whitespace/openers and the lowercase word typed in this session, and the field's
     /// reported length must confirm (once per session) that this is the whole field. Any
     /// other finding settles the session: no further reads for it.
@@ -654,15 +661,10 @@ final class CorrectionEngine {
         guard fieldStart == .confirmed, let replacement = SentenceCapitalization.replacement(for: candidate.original) else { return false }
         let proposal = Proposal(snapshot: snapshot, range: candidate.range, original: candidate.original,
                                 replacement: replacement, created: Date(), capitalizesFieldStart: true)
-        if preferences.asksBeforeCorrecting {
-            // Review mode: offer once, never edit. The next key clears the proposal; the
-            // completed word is offered again through the ordinary delimiter path.
-            fieldStartAttempts = 3
-            showSuggestion(proposal, spelling: false)
-            return true
-        }
-        fieldStartAttempts += 1
-        perform(proposal, isUndo: false, andIgnore: false)
+        // Review mode: offer once, never edit. The next key clears the proposal; the
+        // completed word is offered again through the ordinary delimiter path.
+        fieldStartAttempts = 3
+        showSuggestion(proposal, spelling: false)
         return true
     }
 
@@ -796,12 +798,12 @@ final class CorrectionEngine {
         return (extended, onScreen, saved.replacement + onScreen.dropFirst(saved.original.count))
     }
 
-    /// Field-start evidence for a completed first word (the fallback when the immediate
-    /// edit never landed, e.g. every attempt was invalidated by fast typing): the completed
-    /// text was typed entirely in this session into a verified empty prose area.
+    /// Field-start evidence for automatic capitalization of a completed first word:
+    /// the completed text was typed entirely in this session into a verified empty
+    /// prose area. Review mode uses this too when no early proposal was approved.
     private func isVerifiedFieldStart(_ completed: String, snapshot: AccessibilityText.Snapshot) -> Bool {
         guard preferences.capitalizesAfterPeriod, snapshot.windowStart == 0, snapshot.isTextArea,
-              completed.utf16.count <= backlog.typedSinceReset else { return false }
+              completed.utf16.count <= backlog.firstWordEvidenceCount else { return false }
         switch fieldStart {
         case .confirmed: return true
         case .finished: return false

@@ -4,6 +4,10 @@ The public **0.3.16 preview is Developer ID signed and Apple notarized**. Its br
 
 Download the [new release](https://github.com/markoderic/autocorrect/releases/tag/v0.3.16) rather than reusing an old ZIP. macOS can still ask whether to open an app downloaded from the Internet; see [Apple's explanation](https://support.apple.com/en-us/102445). Do not disable Gatekeeper or remove quarantine as an installation step. Another-Mac first launch remains to be checked.
 
+## October 19 development fix
+
+Local 0.3.17 is installed with the existing Apple Development identity. Release preflight failed before build/submission: `No Keychain password item found for profile: AutoCorrect-notary`. No 0.3.17 notarization submission or public asset exists. The public 0.3.16 ZIP and checksum above remain unchanged. Restore the authorized profile through `xcrun notarytool store-credentials AutoCorrect-notary` locally, then use the normal separate Developer ID release and verification sequence. Never send the password in chat or commit it.
+
 ## Maintainer prerequisites
 
 1. An active Apple Developer Program team and a **Developer ID Application** certificate with its private key in the build Mac's keychain. An **Apple Development** certificate is not interchangeable. The account holder may need to create the Developer ID certificate.

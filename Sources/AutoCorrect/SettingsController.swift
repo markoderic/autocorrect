@@ -181,7 +181,7 @@ final class SettingsController: NSWindowController, NSTableViewDataSource, NSTab
             toggle("Fix missing spaces", value: preferences.separatesJoinedWords, action: #selector(setJoinedWords(_:))),
             label("Separate clear two-word combinations such as iknow and thankyou.", size: 12, secondary: true),
             toggle("Capitalize sentence starts", value: preferences.capitalizesAfterPeriod, action: #selector(setCapitals(_:))),
-            label("Capitalizes the first letter you type in an empty text area and the word after . ? ! once it is complete. Undo keeps your preferred casing; deleting the whole first attempt starts fresh.", size: 12, secondary: true),
+            label("Capitalizes the first word in an empty text area and the word after . ? ! once you finish the word. Pausing on a letter leaves it alone. Undo keeps your preferred casing; deleting the whole first attempt starts fresh.", size: 12, secondary: true),
             toggle("Show spelling underlines", value: preferences.showsSpellingIndicators, action: #selector(setUnderlines(_:))),
             label("Marks the latest possible misspelling where the editor exposes its position. Other apps’ spelling settings stay unchanged.", size: 12, secondary: true),
             toggle("Show Undo popup beside corrections", value: preferences.showsCorrectionPopup, action: #selector(setPopup(_:))),

@@ -2,6 +2,23 @@ import XCTest
 @testable import AutoCorrectCore
 
 final class CompletedWordBacklogTests: XCTestCase {
+    func testBackspaceKeepsOnlyUnfinishedPrefixEvidence() {
+        var queue = CompletedWordBacklog()
+        for c in "tex" { queue.append(String(c)) }
+        queue.resetAfterBackspace()
+        XCTAssertEqual(queue.firstWordEvidenceCount, 2)
+        XCTAssertEqual(queue.typedSinceReset, 0, "retained text is not a fresh attempt")
+        queue.append("h"); queue.append(" ")
+        XCTAssertEqual(queue.firstWordEvidenceCount, 4)
+        XCTAssertEqual(queue.typedSinceReset, 2)
+        queue.resetAfterBackspace()
+        XCTAssertEqual(queue.firstWordEvidenceCount, 0, "completed-word deletion resets all evidence")
+        queue.append("a"); queue.resetAfterBackspace(); queue.resetAfterBackspace()
+        XCTAssertEqual(queue.firstWordEvidenceCount, 0)
+        queue.append("b"); queue.reset()
+        XCTAssertEqual(queue.firstWordEvidenceCount, 0, "navigation/focus clears retained evidence")
+    }
+
     func testFastTypingRetainsCompletedIAndFollowingWords() {
         var queue = CompletedWordBacklog()
         for character in "i ths next" { queue.append(String(character)) }

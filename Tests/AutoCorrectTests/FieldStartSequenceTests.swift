@@ -68,6 +68,51 @@ final class FieldStartSequenceTests: XCTestCase {
         engine.processBoundaries(using: host.snapshot())
     }
 
+    /// Preserve coverage of explicit early approvals and their subsequent undo/casing.
+    /// Automatic mode no longer performs this edit merely because typing paused.
+    private func typeAndApproveInitial(_ keys: String) {
+        preferences.asksBeforeCorrecting = true
+        typeFast(keys)
+        XCTAssertNotNil(engine.pending)
+        engine.approve()
+        preferences.asksBeforeCorrecting = false
+    }
+
+    func testPausedInitialNeverReachesDestructiveTransport() {
+        for prefix in ["a", "A", "h", "i", "ab", "apple", "(a", " a"] {
+            engine.invalidate(); host.text = ""
+            var edits = 0
+            engine.editTransport = { _, _, completion in
+                edits += 1
+                // Model an editor that loses the reinserted text after its last
+                // character is deleted. The fix must never enter this path.
+                self.host.text = ""
+                completion("")
+            }
+            type(prefix)
+            for _ in 0..<4 { engine.processBoundaries(using: host.snapshot()) }
+            XCTAssertEqual(host.text, prefix, prefix)
+            XCTAssertEqual(edits, 0, "No automatic edit of unfinished text: \(prefix)")
+        }
+    }
+
+    func testSlowAndFastFirstWordsWaitForBoundaryAndStillCorrect() {
+        for fast in [false, true] {
+            for (input, expected) in [("a", "A "), ("A", "A "), ("apple", "Apple "),
+                                      ("teh", "The "), ("github", "GitHub ")] {
+                engine.invalidate(); host.text = ""
+                let initialCount = engine.correctionCount
+                if fast { typeFast(input) } else { type(input) }
+                XCTAssertEqual(host.text, input)
+                XCTAssertEqual(engine.correctionCount, initialCount)
+                type(" ")
+                XCTAssertEqual(host.text, expected)
+                type("next ")
+                XCTAssertEqual(host.text, expected + "next ")
+            }
+        }
+    }
+
     func testDeletingFirstAttemptStartsFreshWithCapitalizationOnAndOff() {
         for capitals in [true, false] {
             engine.invalidate(); host.text = ""
@@ -169,7 +214,7 @@ final class FieldStartSequenceTests: XCTestCase {
             let initialCount = engine.correctionCount
             let host = self.host!
             engine.editTransport = { proposal, plan, completion in completion(host.apply(proposal, plan)) }
-            type(tail == "ithub " ? "g" : "i")
+            typeAndApproveInitial(tail == "ithub " ? "g" : "i")
             var canceled: ((String?) -> Void)?
             engine.editTransport = { _, _, completion in canceled = completion }
             type(tail)
@@ -201,7 +246,7 @@ final class FieldStartSequenceTests: XCTestCase {
         type("i")
         preferences.asksBeforeCorrecting = true
         type("Phone ")
-        XCTAssertEqual(host.text, "IPhone ")
+        XCTAssertEqual(host.text, "iPhone ")
         XCTAssertEqual(engine.pending?.replacement, "my phone")
         engine.approve()
         XCTAssertEqual(host.text, "my phone ")
@@ -215,11 +260,11 @@ final class FieldStartSequenceTests: XCTestCase {
         engine.invalidate(); host.text = ""
         preferences.ignoredWords = ["iphone"]
         type("i"); type("Phone ")
-        XCTAssertEqual(host.text, "IPhone ")
+        XCTAssertEqual(host.text, "iPhone ")
     }
 
     func testCanceledReconciliationStopsAfterThreeUnpostedAttempts() {
-        type("g")
+        typeAndApproveInitial("g")
         var attempts = 0
         engine.editTransport = { _, _, completion in attempts += 1; completion(nil) }
         type("ithub ")
@@ -230,7 +275,7 @@ final class FieldStartSequenceTests: XCTestCase {
     }
 
     func testPostedReconciliationWithFailedVerificationNeverReplays() {
-        type("i")
+        typeAndApproveInitial("i")
         let host = self.host!
         var attempts = 0
         engine.editTransport = { proposal, plan, completion in
@@ -246,7 +291,7 @@ final class FieldStartSequenceTests: XCTestCase {
     }
 
     func testDelayedCancellationAfterFocusResetDoesNotReviveOldOccurrence() throws {
-        type("i")
+        typeAndApproveInitial("i")
         var canceled: ((String?) -> Void)?
         engine.editTransport = { _, _, completion in canceled = completion }
         type("Phone ")
@@ -260,7 +305,7 @@ final class FieldStartSequenceTests: XCTestCase {
     }
 
     func testFirstLetterCapitalIsReconciledWithProductCasing() {
-        type("g")
+        typeAndApproveInitial("g")
         XCTAssertEqual(host.text, "G")
         type("ithub ")
         XCTAssertEqual(host.text, "GitHub ")
@@ -271,10 +316,10 @@ final class FieldStartSequenceTests: XCTestCase {
 
     func testLowercaseIphoneAndCanonicalMixedCaseFinishAsIphone() {
         type("i")
-        XCTAssertEqual(host.text, "I")
+        XCTAssertEqual(host.text, "i")
         type("phone ")
         XCTAssertEqual(host.text, "iPhone ")
-        // Typed with its internal capital: our capital is undone, nothing else changes.
+        // Typed with its internal capital: automatic mode preserves it throughout.
         engine.invalidate(); host.text = ""
         type("i")
         type("Phone ")
@@ -312,7 +357,7 @@ final class FieldStartSequenceTests: XCTestCase {
         preferences.ignoredWords = ["github"]
         engine.invalidate(); host.text = ""
         type("g"); type("ithub ")
-        XCTAssertEqual(host.text, "Github ", "an ignored word is left as typed apart from the sentence capital")
+        XCTAssertEqual(host.text, "github ", "an ignored word is left exactly as typed")
         preferences.ignoredWords = []
         preferences.normalizesProductNames = false
         engine.invalidate(); host.text = ""
@@ -320,7 +365,7 @@ final class FieldStartSequenceTests: XCTestCase {
         XCTAssertEqual(host.text, "Github ", "product casing off: only the sentence capital applies")
         engine.invalidate(); host.text = ""
         type("i"); type("Phone ")
-        XCTAssertEqual(host.text, "IPhone ", "product casing off: the typed internal capital is not treated as canonical")
+        XCTAssertEqual(host.text, "iPhone ", "product casing off: typed internal capitals remain unchanged")
         preferences.normalizesProductNames = true
         preferences.capitalizesAfterPeriod = false
         engine.invalidate(); host.text = ""
@@ -329,7 +374,7 @@ final class FieldStartSequenceTests: XCTestCase {
     }
 
     func testExplicitCapitalizationUndoWinsAndCausesNoLoop() {
-        type("g")
+        typeAndApproveInitial("g")
         XCTAssertEqual(host.text, "G")
         // Explicit Undo rejects capitalization; deleting the whole attempt instead starts fresh.
         engine.undo()
@@ -344,7 +389,7 @@ final class FieldStartSequenceTests: XCTestCase {
     // MARK: Fix 2 — undo after continued typing
 
     func testUndoImmediatelyAfterFirstLetter() {
-        type("h")
+        typeAndApproveInitial("h")
         XCTAssertEqual(host.text, "H")
         engine.undo()
         XCTAssertEqual(host.text, "h")
@@ -354,12 +399,12 @@ final class FieldStartSequenceTests: XCTestCase {
     }
 
     func testUndoAfterFinishingTheWordAndTheSentence() {
-        type("h"); type("ello")
+        typeAndApproveInitial("h"); type("ello")
         XCTAssertEqual(host.text, "Hello")
         engine.undo()
         XCTAssertEqual(host.text, "hello")
         engine.invalidate(); host.text = ""
-        type("h"); type("ello world")
+        typeAndApproveInitial("h"); type("ello world")
         XCTAssertEqual(host.text, "Hello world")
         engine.undo()
         XCTAssertEqual(host.text, "hello world")
@@ -368,7 +413,7 @@ final class FieldStartSequenceTests: XCTestCase {
     }
 
     func testUndoAfterFastTypingRecasedMoreThanOneLetter() {
-        typeFast("he")
+        typeAndApproveInitial("he")
         XCTAssertEqual(host.text, "He")
         type("llo world")
         engine.undo()
@@ -376,7 +421,7 @@ final class FieldStartSequenceTests: XCTestCase {
     }
 
     func testUndoWithLeadingQuoteAndFollowingPunctuation() {
-        type("\"h")
+        typeAndApproveInitial("\"h")
         XCTAssertEqual(host.text, "\"H")
         type("ello,\" she said")
         engine.undo()
@@ -384,19 +429,19 @@ final class FieldStartSequenceTests: XCTestCase {
     }
 
     func testUndoFailsSafelyWhenTextChangedOrContinuationIsUnsupported() {
-        type("h"); type("ello")
+        typeAndApproveInitial("h"); type("ello")
         host.text = "Xello"                      // the span itself changed
         engine.undo()
         XCTAssertEqual(host.text, "Xello")
         XCTAssertTrue(engine.status.hasPrefix("Undo unavailable"), engine.status)
         engine.invalidate(); host.text = ""
-        type("h")
+        typeAndApproveInitial("h")
         host.text = "Héllo"                      // non-ASCII continuation: no deletion plan
         engine.undo()
         XCTAssertEqual(host.text, "Héllo")
         XCTAssertNotEqual(engine.status, "Correction undone")
         engine.invalidate(); host.text = ""
-        type("h"); type("ello")
+        typeAndApproveInitial("h"); type("ello")
         host.isTextArea = false
         engine.snapshotProvider = { nil }       // focus moved: no fresh read
         engine.undo()
@@ -464,7 +509,9 @@ final class FieldStartSequenceTests: XCTestCase {
         XCTAssertTrue(preferences.capitalizesAfterPeriod)
         host.text = ""
         type("h")
-        XCTAssertEqual(host.text, "H")
+        XCTAssertEqual(host.text, "h")
+        type("ello ")
+        XCTAssertEqual(host.text, "Hello ")
         preferences.capitalizesAfterPeriod = false
         engine.refresh(); host.text = ""
         type("h")
@@ -477,7 +524,7 @@ final class FieldStartSequenceTests: XCTestCase {
 extension FieldStartSequenceTests {
     func testReviewPartialBackspaceBeforeFirstBoundary() {
         type("tex")
-        XCTAssertEqual(host.text, "Tex")
+        XCTAssertEqual(host.text, "tex")
         engine.debugDeleteKey(); host.text.removeLast()
         type("h ")
         XCTAssertEqual(host.text, "The ", "editing an unfinished word is not rejecting a spelling correction")
@@ -512,12 +559,12 @@ extension FieldStartSequenceTests {
 extension FieldStartSequenceTests {
     func testRepeatedBackspacesAndMistakesBeforeTheFirstSpace() {
         type("tex")
-        XCTAssertEqual(host.text, "Tex")
+        XCTAssertEqual(host.text, "tex")
         engine.debugDeleteKey(); host.text.removeLast()
         type("j")
         engine.debugDeleteKey(); host.text.removeLast()
         engine.debugDeleteKey(); host.text.removeLast()
-        XCTAssertEqual(host.text, "T")
+        XCTAssertEqual(host.text, "t")
         type("eh ")
         XCTAssertEqual(host.text, "The ", "several corrections while the first word is unfinished are still just typing")
     }
@@ -550,12 +597,12 @@ extension FieldStartSequenceTests {
         type("tex")
         engine.debugDeleteKey(); host.text.removeLast()
         type("h ")
-        XCTAssertEqual(host.text, "Teh ")
+        XCTAssertEqual(host.text, "teh ")
     }
 
     func testCompleteFieldRestartAfterCapitalCorrectsTheNewWord() {
         type("tex")
-        XCTAssertEqual(host.text, "Tex")
+        XCTAssertEqual(host.text, "tex")
         host.text = ""
         engine.debugDeleteKey(); engine.debugDeleteKey(); engine.debugDeleteKey()
         type("teh ")

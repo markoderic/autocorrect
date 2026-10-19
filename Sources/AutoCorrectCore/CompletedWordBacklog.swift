@@ -20,6 +20,9 @@ public struct CompletedWordBacklog {
     public private(set) var boundaries: [Boundary] = []
     /// Supported keystrokes since the last reset (a count only, capped; no characters).
     public private(set) var typedSinceReset = 0
+    /// Net supported input for field-start evidence, including the retained prefix
+    /// after an ordinary Backspace inside the unfinished first word. No text is stored.
+    public private(set) var firstWordEvidenceCount = 0
     private var wordStarted = false
     private var delimiterAfterWord = false
     private var previousWasDelimiter = true
@@ -28,17 +31,29 @@ public struct CompletedWordBacklog {
     public init() {}
 
     /// True while the keystrokes since the last reset are optional leading delimiters
-    /// (spaces, quotes, brackets) followed by one unfinished word: the only situation in
-    /// which a field-start capitalization check is worth a read.
+    /// (spaces, quotes, brackets) followed by one unfinished word. Used for review-mode
+    /// suggestions and retaining bounded field-start evidence across Backspace.
     public var isTypingFirstWord: Bool { wordStarted && !delimiterAfterWord }
 
     public mutating func reset() {
         boundaries.removeAll(keepingCapacity: true)
         typedSinceReset = 0
+        firstWordEvidenceCount = 0
         wordStarted = false
         delimiterAfterWord = false
         previousWasDelimiter = true
         pendingAmbiguousPunctuation = false
+    }
+
+    /// Retain only evidence for characters this session supplied before Backspace.
+    /// Completed boundaries and strict fresh-attempt counts still reset. Forward delete,
+    /// modified deletion, navigation and focus changes must use a full reset instead.
+    public mutating func resetAfterBackspace() {
+        let retained = isTypingFirstWord ? max(0, firstWordEvidenceCount - 1) : 0
+        reset()
+        firstWordEvidenceCount = retained
+        wordStarted = retained > 0
+        previousWasDelimiter = retained == 0
     }
 
     /// Navigation, deletion, paste, modifiers, focus, and mouse changes must reset
@@ -46,6 +61,7 @@ public struct CompletedWordBacklog {
     public mutating func append(_ text: String) {
         guard TypingTypography.isSupportedKeystroke(text), let character = text.first else { reset(); return }
         typedSinceReset = min(typedSinceReset + 1, 4096)
+        firstWordEvidenceCount = min(firstWordEvidenceCount + 1, 4096)
         for index in boundaries.indices { boundaries[index].trailingUTF16 += 1 }
         boundaries.removeAll { $0.trailingUTF16 > 96 }
         let delimiter = CorrectionPolicy.isDelimiter(character)
