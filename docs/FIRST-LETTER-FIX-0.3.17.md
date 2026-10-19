@@ -14,7 +14,7 @@ Backspace within an unfinished first word retains a bounded count of previously 
 
 - Added two production-engine regressions before the fix: 28 failing assertions. One models an editor losing reinsertion and requires that unfinished text never reach destructive transport. The other covers slow/fast input, a/A, ordinary words, spelling, product casing and following text.
 - Added a queue test for retained first-word evidence versus a genuinely fresh attempt. Existing early-edit tests now explicitly approve the early suggestion, preserving their cancellation, verification, casing and Undo assertions. Automatic tests assert delayed capitalization and exact preservation of ignored/mixed-case words.
-- Full local suite: **379 executed, 375 passed, four gated audits skipped, zero failures**. Universal arm64/x86_64 build passed.
+- Full local suite: **379 executed, 375 passed, four gated audits skipped, zero failures**. Universal arm64/x86_64 build passed. Source `298963b` is pushed; [hosted macOS 14 CI](https://github.com/markoderic/autocorrect/actions/runs/39299878063) passed tests, release orchestration checks and universal compilation.
 - **Owner-confirmed physical Claude result on installed 0.3.17:** lowercase `a` and Shift+A both stayed visible after a two-second pause. This closes the reported reproduction, not every Claude editor/Undo/fast-typing path.
 - Installed app diagnostics: Accessibility, Input Monitoring, keyboard listener/layout available, login enabled. Settings shows Ready. Existing signing identity and permissions preserved; rollback is `/Applications/AutoCorrect.previous-20261019-140500.app`.
 
