@@ -24,3 +24,11 @@ It also passes through repeated correction cycles with one-character and twelve-
 - Normal startup with tracing off; Settings Ready / both permissions Allowed. Installed diagnostics: permissions, listener creation and supported layout true, login enabled. Exact combined-sentence physical retest requested, pending. This remains distinct from engine/native-event simulation.
 - Runtime `bb33c556e94ceca51bc9307c111738e4d2ae61b3` pushed; [hosted CI 39651368819](https://github.com/markoderic/autocorrect/actions/runs/39651368819) passed tests, release-script checks, universal build and archive upload. This CI archive is not the public notarized release. Latest physical retest had no reply at task close; do not convert the earlier failed combined test into a pass.
 - Public remains notarized 0.3.16. Missing local `AutoCorrect-notary` credentials still block a new notarized public download; no new submission or upload.
+
+## Owner physical confirmation
+
+Later on October 21, the owner replied to the exact combined-sentence retest with:
+
+`It's a problem let's fix this it works it doesn't work and hello`
+
+They explicitly confirmed every example now works. This closes this reported combined-sentence regression with user-reported physical evidence in addition to the automated tests. The reply did not restate the host app; it does not establish separate passes in multiple apps, long-duration listener reliability or general 1.0 readiness. The earlier failed 0.3.19 result remains part of the history. No runtime change or new installation was needed for this confirmation.
