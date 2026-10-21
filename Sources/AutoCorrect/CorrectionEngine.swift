@@ -30,7 +30,11 @@ final class CorrectionEngine {
     private(set) var undoProposal: Proposal?
     private(set) var flaggedWord: String?
     private(set) var correctionCount = 0
-    private(set) var status = "Ready"
+    private var detailStatus = "Ready"
+    private(set) var status: String {
+        get { inputSession.state.message ?? detailStatus }
+        set { detailStatus = newValue }
+    }
     private var generation: UInt64 = 0
     private var sessionEpoch: UInt64 = 0
     private var work: DispatchWorkItem?
@@ -137,11 +141,19 @@ final class CorrectionEngine {
     }
     private var cache: [String: Assessment] = [:]
     private let indicator = SpellingIndicator()
-    private let monitor = KeyboardMonitor()
+    private let monitor: KeyboardMonitoring
+    private let inputAccess: () -> InputSession.Access
+    private(set) lazy var inputSession = InputSession(monitor: monitor,
+        enabled: { [weak self] in self?.preferences.enabled ?? false }, access: inputAccess,
+        reset: { [weak self] in self?.invalidate(); self?.detailStatus = "Ready" },
+        changed: { [weak self] in self?.onChange?() })
     var isRunning: Bool { monitor.isRunning }
 
-    init(preferences: Preferences, analyzer: SentenceAnalyzer? = nil) {
+    init(preferences: Preferences, analyzer: SentenceAnalyzer? = nil,
+         monitor: KeyboardMonitoring = KeyboardMonitor(), inputAccess: @escaping () -> InputSession.Access = { .current }) {
         self.preferences = preferences
+        self.monitor = monitor
+        self.inputAccess = inputAccess
         sentences = SentenceAssistant(analyzer: analyzer ?? SentenceAnalyzers.preferred())
         sentences.grammarEnabled = { preferences.grammarSuggestions }
         sentences.punctuationEnabled = { preferences.punctuationSuggestions }
@@ -152,6 +164,10 @@ final class CorrectionEngine {
         sentences.isSpanProtected = { [weak self] _, location, original in self?.isSuggestionSpanProtected(location: location, original: original) ?? true }
         monitor.onKey = { [weak self] text, flags, key in self?.key(text, flags: flags, keyCode: key) }
         monitor.onMouse = { [weak self] type, location in self?.handleMouse(type: type, location: location) }
+        monitor.onInterruption = { [weak self] in
+            self?.inputSession.interrupted()
+            DispatchQueue.main.async { [weak self] in self?.checkInputHealth() }
+        }
         monitor.onUndo = { [weak self] in
             guard let self, self.undoProposal != nil, !self.inFlight else { return false }
             DispatchQueue.main.async { self.undo() }
@@ -373,20 +389,22 @@ final class CorrectionEngine {
     func refresh() {
         invalidate()
         cache.removeAll(keepingCapacity: false)
-        guard preferences.enabled else { monitor.stop(); status = "Paused"; onChange?(); return }
-        guard AXIsProcessTrusted() else { monitor.stop(); status = "Accessibility permission needed"; onChange?(); return }
-        guard CGPreflightListenEventAccess() else { monitor.stop(); status = "Input Monitoring permission needed"; onChange?(); return }
+        inputSession.check()
+        guard inputSession.state == .ready else { onChange?(); return }
         prepareFocusedApplication()
-        status = monitor.start() ? "Ready" : "Keyboard access unavailable — restart AutoCorrect"
+        status = "Ready"
         onChange?()
         scheduleScan(delay: 200)
     }
 
     func focusChanged() {
         invalidate()
+        checkInputHealth()
         prepareFocusedApplication()
         scheduleScan(delay: 400)
     }
+
+    func checkInputHealth() { inputSession.check() }
 
     private func prepareFocusedApplication() {
         guard preferences.enabled, let app = NSWorkspace.shared.frontmostApplication,
@@ -464,6 +482,7 @@ final class CorrectionEngine {
     }
 
     private func key(_ text: String?, flags: CGEventFlags, keyCode: Int64) {
+        guard inputSession.state == .ready else { return }
         if [51, 117].contains(keyCode) { pendingDeletionRestart = true }
         else if flags.contains(.maskCommand) || flags.contains(.maskControl) || flags.contains(.maskAlternate)
                     || [36, 48, 53, 76, 115, 116, 119, 121, 123, 124, 125, 126].contains(keyCode) {

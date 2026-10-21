@@ -2,7 +2,20 @@ import AppKit
 import Carbon
 import AutoCorrectCore
 
-final class KeyboardMonitor {
+protocol KeyboardMonitoring: AnyObject {
+    var onKey: ((String?, CGEventFlags, Int64) -> Void)? { get set }
+    var onMouse: ((CGEventType, CGPoint) -> Void)? { get set }
+    var onUndo: (() -> Bool)? { get set }
+    var onShowPopup: (() -> Bool)? { get set }
+    var onInterruption: (() -> Void)? { get set }
+    var isRunning: Bool { get }
+    func start() -> Bool
+    func stop()
+    func replace(_ plan: KeyboardReplacementPlan, validate: @escaping () -> Bool, completion: @escaping (Bool) -> Void)
+}
+
+final class KeyboardMonitor: KeyboardMonitoring {
+    var onInterruption: (() -> Void)?
     var onKey: ((String?, CGEventFlags, Int64) -> Void)?
     /// Mouse-down or scroll anywhere on the system, with the event type and Quartz location.
     var onMouse: ((CGEventType, CGPoint) -> Void)?
@@ -21,7 +34,10 @@ final class KeyboardMonitor {
     private var nextEdit: Int64 = 0
     private static let triggerBase: Int64 = 0x4155435400000000
     private static let injectedMarker: Int64 = 0x4155434900000000
-    var isRunning: Bool { tap != nil && CGEvent.tapIsEnabled(tap: tap!) }
+    var isRunning: Bool {
+        guard let tap, let source else { return false }
+        return CFMachPortIsValid(tap) && CFRunLoopSourceIsValid(source) && CGEvent.tapIsEnabled(tap: tap)
+    }
 
     func start() -> Bool {
         if isRunning { return true }
@@ -31,6 +47,14 @@ final class KeyboardMonitor {
         guard let tap = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .tailAppendEventTap, options: .defaultTap, eventsOfInterest: mask, callback: { proxy, type, event, context in
             guard let context = context else { return Unmanaged.passUnretained(event) }
             let monitor = Unmanaged<KeyboardMonitor>.fromOpaque(context).takeUnretainedValue()
+            // Handle system notices before inspecting event markers. The input stream
+            // has a gap; old queued words/edits are no longer safe to use.
+            if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+                monitor.onInterruption?()
+                monitor.cancelEdit()
+                if let tap = monitor.tap, CFMachPortIsValid(tap) { CGEvent.tapEnable(tap: tap, enable: true) }
+                return Unmanaged.passUnretained(event)
+            }
             let marker = event.getIntegerValueField(.eventSourceUserData)
             if marker == KeyboardMonitor.injectedMarker { return Unmanaged.passUnretained(event) }
             if marker & Int64(bitPattern: 0xffffffff00000000) == KeyboardMonitor.triggerBase {
@@ -50,10 +74,7 @@ final class KeyboardMonitor {
                 }
                 return nil
             }
-            if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-                monitor.cancelEdit()
-                if let tap = monitor.tap { CGEvent.tapEnable(tap: tap, enable: true) }
-            } else if type == .keyDown {
+            if type == .keyDown {
                 monitor.cancelEdit()
                 let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
                 let chord = event.flags.intersection([.maskControl, .maskAlternate, .maskCommand, .maskShift]) == [.maskControl, .maskAlternate, .maskCommand]
@@ -72,9 +93,11 @@ final class KeyboardMonitor {
             return Unmanaged.passUnretained(event)
         }, userInfo: Unmanaged.passUnretained(self).toOpaque()) else { return false }
         self.tap = tap
-        source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
-        if let source = source { CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes) }
+        guard let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0) else { stop(); return false }
+        self.source = source
+        CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
+        guard isRunning else { stop(); return false }
         return true
     }
 

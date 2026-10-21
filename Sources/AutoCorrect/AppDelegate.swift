@@ -10,6 +10,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let quickPanel = MenuBarPanel()
     private lazy var statusImage = AppIcon.menuImage()
     private var workspaceObserver: NSObjectProtocol?
+    private var sessionObservers: [NSObjectProtocol] = []
+    private var inputHealthTimer: Timer?
     private var settings: SettingsController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -30,6 +32,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // Warm the system spelling service before installing the active event tap.
         _ = engine.suggestion("teh")
         engine.refresh()
+        let workspace = NSWorkspace.shared.notificationCenter
+        for (name, action) in [
+            (NSWorkspace.willSleepNotification, { [weak self] in self?.engine.inputSession.setSleeping(true) }),
+            (NSWorkspace.didWakeNotification, { [weak self] in self?.engine.inputSession.setSleeping(false) }),
+            (NSWorkspace.sessionDidResignActiveNotification, { [weak self] in self?.engine.inputSession.setInactive(true) }),
+            (NSWorkspace.sessionDidBecomeActiveNotification, { [weak self] in self?.engine.inputSession.setInactive(false) })
+        ] {
+            sessionObservers.append(workspace.addObserver(forName: name, object: nil, queue: .main) { _ in _ = action() })
+        }
+        // One coalescible check every five seconds, including while a menu is open.
+        // No field reads, dictionary work, synthetic keys or typing-history tracking.
+        let timer = Timer(timeInterval: 5, repeats: true) { [weak self] _ in self?.engine.checkInputHealth() }
+        timer.tolerance = 1
+        RunLoop.main.add(timer, forMode: .common)
+        inputHealthTimer = timer
         if !UserDefaults.standard.bool(forKey: "didConfigureLogin"), Bundle.main.bundleURL.pathExtension == "app" {
             do {
                 try SMAppService.mainApp.register()
@@ -48,7 +65,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func openQuickPanel() {
         guard let button = statusItem.button else { return }
         if quickPanel.isShown { quickPanel.close(); return }
-        if preferences.enabled && !engine.isRunning { engine.refresh() }
+        engine.checkInputHealth()
         rebuildMenu()
         if NSApp.currentEvent?.type == .rightMouseUp || NSApp.currentEvent?.type == .keyDown {
             showFullMenu(); return
@@ -60,6 +77,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func presentQuickControls(keyboardFocus: Bool) {
         guard let button = statusItem.button else { return }
+        engine.checkInputHealth()
         rebuildMenu()
         quickPanel.show(relativeTo: button, menu: menu, status: engine.status, count: engine.correctionCount,
                         enabled: preferences.enabled, keyboardFocus: keyboardFocus) { [weak self] in self?.showFullMenu() }
@@ -90,10 +108,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         if let workspaceObserver = workspaceObserver { NSWorkspace.shared.notificationCenter.removeObserver(workspaceObserver) }
+        for observer in sessionObservers { NSWorkspace.shared.notificationCenter.removeObserver(observer) }
+        inputHealthTimer?.invalidate()
     }
 
     func menuWillOpen(_ menu: NSMenu) {
-        if preferences.enabled && !engine.isRunning { engine.refresh() }
+        engine.checkInputHealth()
         rebuildMenu()
     }
 
