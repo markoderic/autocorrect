@@ -48,9 +48,9 @@ Then open **AutoCorrect** from **Applications** and follow steps 3–4 above. Th
 
 **This is an early release.** App compatibility varies; it cannot correct text in every app or field. See [validation and known limits](docs/VALIDATION.md).
 
-## Development fixes: 0.3.19
+## Development fixes: 0.3.20
 
-The installed development build preserves unchanged text during corrections, instead of erasing and retyping the whole word plus following text. It adds short missing-double repairs such as `helo` → `hello` and contextual repairs such as `it woks` → `it works` and `it doest work` → `it doesn't work`. `its a problem` and `lets fix this` use the existing contextual contractions; valid `its screen`, `she lets me` and `two woks` remain unchanged. [Editing and accuracy validation](docs/EDIT-INTEGRITY-0.3.19.md).
+The installed development build preserves unchanged text during corrections, instead of erasing and retyping the whole word plus following text. It adds short missing-double repairs such as `helo` → `hello` and contextual repairs such as `it woks` → `it works` and `it doest work` → `it doesn't work`. `its a problem` and `lets fix this` use the existing contextual contractions; valid `its screen`, `she lets me` and `two woks` remain unchanged. [Editing and accuracy validation](docs/EDIT-INTEGRITY-0.3.19.md). Version 0.3.20 also handles supported local clauses inside a longer unpunctuated message, and retains the `helo` repair when sentence context changes native guess ordering. [Combined-sentence follow-up](docs/COMBINED-TYPING-0.3.20.md).
 
 It retains automatic listener recovery from 0.3.18 and the unfinished-first-letter protection from 0.3.17. The owner confirmed corrections resumed after the recovery update. [Recovery tests and limits](docs/INPUT-RECOVERY-0.3.18.md).
 

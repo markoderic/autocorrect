@@ -27,3 +27,7 @@ The dictionary probes also showed:
 ## Release boundary
 
 Installed development build only. Public remains the notarized 0.3.16; the October 21 notarization preflight still cannot find `AutoCorrect-notary`. No new Apple submission or public binary upload occurred. Original intermittent stop trigger, sustained recovery and wider editor/caret/Undo behavior remain acceptance items before 1.0.
+
+## Physical follow-up
+
+The owner subsequently typed the combined sequence in this chat and reported remaining misses: `It's a problem lets fix this it woks it doest work and helo`. Treat that as a failed real-world acceptance check, not confirmation of the isolated fixtures. The same sequence reproduced all four misses in the 0.3.19 engine: its context guards required a clause start, and the native ranking for `hello` moved to fourth place. Follow-up work is recorded in [0.3.20](COMBINED-TYPING-0.3.20.md). Runtime `8fe4061aaad0761275db8481f0b06417a30724ec` passed [CI 39650331851](https://github.com/markoderic/autocorrect/actions/runs/39650331851); that green CI did not establish physical acceptance.

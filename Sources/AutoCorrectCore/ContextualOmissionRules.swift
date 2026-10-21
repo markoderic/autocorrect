@@ -16,9 +16,18 @@ public enum ContextualOmissionRules {
     private static func singularSubject(_ prefix: String) -> Bool {
         let clause = prefix.components(separatedBy: CharacterSet(charactersIn: ".!?\n")).last ?? prefix
         let text = clause.trimmingCharacters(in: .whitespaces).lowercased()
-        if ["it", "he", "she", "this", "that"].contains(text) { return true }
         let words = text.split(separator: " ").map(String.init)
-        return words.count == 2 && ["the", "this", "that", "my", "your", "our"].contains(words[0]) && singularThings.contains(words[1])
+        guard let last = words.last else { return false }
+        let preceding = words.dropLast().last ?? ""
+        // A local subject may follow an earlier clause without punctuation in chat.
+        // Keep object/quoted-name frames out ("watch it work", "call it woks").
+        let objectFrames: Set<String> = ["watch", "watched", "see", "saw", "hear", "heard", "feel", "felt",
+            "let", "lets", "make", "makes", "made", "help", "helps", "have", "had", "call", "called", "calls",
+            "name", "named", "label", "labeled", "labelled", "dub", "dubbed", "does", "did", "can", "could", "would", "should", "will", "may", "might", "must", "to",
+            "with", "without", "in", "on", "at", "for", "of", "about", "from", "by", "over", "under", "near", "beside"]
+        if ["it", "he", "she", "this", "that"].contains(last) { return !objectFrames.contains(preceding) }
+        return singularThings.contains(last) && ["the", "this", "that", "my", "your", "our"].contains(preceding)
+            && !objectFrames.contains(words.dropLast(2).last ?? "")
     }
 
     private static func omission(_ source: String, of target: String) -> Bool {

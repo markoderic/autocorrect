@@ -4,6 +4,17 @@ import AutoCorrectCore
 @testable import AutoCorrect
 
 final class ReportedTypingTests: XCTestCase {
+    func testCombinedRunOnSentenceFromPhysicalReport() {
+        let name = "CombinedTyping.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
+        let preferences = Preferences(defaults: defaults)
+        let engine = CorrectionEngine(preferences: preferences)
+        engine.suppressesRendering = true
+        let text = "It's a problem lets fix this it woks it doest work and helo "
+        XCTAssertEqual(engine.previewText(in: text), "It's a problem let's fix this it works it doesn't work and hello ")
+    }
+
     func testReportedWordsAndPhrases() {
         let name = "ReportedTyping.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: name)!
@@ -21,7 +32,9 @@ final class ReportedTypingTests: XCTestCase {
                                  ("its working now ", "it's working now "), ("lets also fix this ", "let's also fix this ")] {
             XCTAssertEqual(engine.previewText(in: text), expected, text)
         }
-        for text in ["two woks ", "the woks are hot ", "thou doest work ", "doest ", "its screen ",
+        for text in ["two woks ", "the woks are hot ", "thou doest work ",
+                     "they call it woks ", "they called this app woks ", "I cook with this woks ", "she lets work pile up ", "the app lets users type ",
+                     "she takes the rope and lets go ", "I heard it work ", "doest ", "its screen ",
                      "its working parts ", "she lets me ", "watch it work ", "HELO ", "woks.txt "] {
             XCTAssertNil(engine.previewText(in: text), text)
         }

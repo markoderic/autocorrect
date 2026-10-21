@@ -78,6 +78,19 @@ final class FieldStartSequenceTests: XCTestCase {
         preferences.asksBeforeCorrecting = false
     }
 
+    func testCombinedReportAcrossSuccessiveTypingAndCorrectionCycles() {
+        let text = "its a problem lets fix this it woks it doest work and helo "
+        for chunkSize in [1, 12] {
+            engine.invalidate(); host.text = ""
+            let characters = Array(text)
+            for start in stride(from: 0, to: characters.count, by: chunkSize) {
+                typeFast(String(characters[start..<min(start + chunkSize, characters.count)]))
+                for _ in 0..<8 { engine.processBoundaries(using: host.snapshot()) }
+            }
+            XCTAssertEqual(host.text, "It's a problem let's fix this it works it doesn't work and hello ")
+        }
+    }
+
     func testReportedContractionsAndOmissionsAfterFirstWordCapitalization() {
         for fast in [false, true] {
             for (typed, expected) in [("its a problem ", "It's a problem "), ("its working now ", "It's working now "),

@@ -356,10 +356,11 @@ public enum CorrectionPolicy {
             return target
         })
         guard candidates.count == 1, let target = candidates.first else { return nil }
-        // Short omissions such as helo/hapy need a top-two, single missing double.
+        // Short omissions such as helo/hapy need a top-five, single missing double.
+        // Sentence context can push hello below help/held/halo despite the same typo.
         // Longer forms retain the existing ranked multi-double repair allowance.
         if source.count == 4 {
-            guard target.count == 5, guesses.prefix(2).contains(where: { $0.lowercased() == target }) else { return nil }
+            guard target.count == 5, guesses.prefix(5).contains(where: { $0.lowercased() == target }) else { return nil }
         }
         return original.first?.isUppercase == true ? target.prefix(1).uppercased() + target.dropFirst() : target
     }

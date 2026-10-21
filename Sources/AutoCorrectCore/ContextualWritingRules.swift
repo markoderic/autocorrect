@@ -137,7 +137,7 @@ public enum ContextualWritingRules {
                     explanation = "This context may describe something belonging to it; possessive ‘its’ has no apostrophe."
                 }
             } else if invitationForms.contains(normalized),
-                      startsClause(at: range.location, in: text) || continuesInvitation(at: range.location, in: text) {
+                      startsClause(at: range.location, in: text) || continuesInvitation(at: range.location, in: text) || explicitInvitationObject(after) {
                 if let verb = after.drop(while: invitationModifiers.contains).first, invitationVerbs.contains(verb) {
                     replacement = "let's"
                     automatic = true
@@ -152,6 +152,15 @@ public enum ContextualWritingRules {
             }
         }
         return nil
+    }
+
+    /// Chat often omits the comma before an invitation. Require a transitive verb
+    /// followed by an explicit object; "lets go" and "lets work pile up" stay ambiguous.
+    private static func explicitInvitationObject(_ after: [String]) -> Bool {
+        let body = Array(after.drop(while: invitationModifiers.contains))
+        let verbs: Set<String> = ["fix", "try", "use", "check", "test", "review", "update", "change", "finish",
+            "open", "close", "download", "install", "publish", "build", "make", "create", "add", "send", "write", "read", "take", "get", "do"]
+        return body.count >= 2 && verbs.contains(body[0]) && ["this", "that", "it", "them", "these", "those"].contains(body[1])
     }
 
     private static func isWordBoundary(before offset: Int, in text: String) -> Bool {
