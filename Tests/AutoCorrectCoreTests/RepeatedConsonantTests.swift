@@ -8,6 +8,17 @@ final class RepeatedConsonantTests: XCTestCase {
         XCTAssertEqual(CorrectionPolicy.repeatedConsonantReplacement(for: "acomodation", guesses: ["accommodation"]), "accommodation")
         XCTAssertEqual(CorrectionPolicy.repeatedConsonantReplacement(for: "Kiding", guesses: ["kidding"]), "Kidding")
     }
+    func testShortOmissionsRequireUniqueTopTwoSingleDouble() {
+        for (source, target, other) in [("helo", "hello", "help"), ("hapy", "happy", "harp"), ("sily", "silly", "silt")] {
+            XCTAssertEqual(CorrectionPolicy.preferredAutomaticReplacement(for: source, systemCorrection: other,
+                guesses: [other, target]), target)
+        }
+        XCTAssertNil(CorrectionPolicy.repeatedConsonantReplacement(for: "helo", guesses: ["help", "held", "hello"]))
+        XCTAssertNil(CorrectionPolicy.repeatedConsonantReplacement(for: "helo", guesses: ["hello", "helllo"]))
+        XCTAssertNil(CorrectionPolicy.repeatedConsonantReplacement(for: "helo", guesses: ["Hello"]))
+        XCTAssertNil(CorrectionPolicy.repeatedConsonantReplacement(for: "HELO", guesses: ["hello"]))
+    }
+
     func testAmbiguityAndUnsupportedChangesAreRejected() {
         XCTAssertNil(CorrectionPolicy.repeatedConsonantReplacement(for: "abacad", guesses: ["abbacad", "abaccad"]))
         for (source, guess) in [("kiding", "riding"), ("kiding", "Kidding"), ("kiding.txt", "kidding"),

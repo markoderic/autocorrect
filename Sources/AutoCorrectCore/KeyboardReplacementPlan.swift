@@ -3,6 +3,16 @@ import Foundation
 /// A validated edit from a collapsed caret, with no temporary text selection.
 /// The caller must revalidate the focused field and snapshot before posting events.
 public struct KeyboardReplacementPlan: Equatable, Sendable {
+    /// Minimal native edit inside the validated suffix. Unchanged trailing characters
+    /// stay in the editor while the caret visits the changed span, then returns.
+    public struct CursorEdit: Equatable, Sendable {
+        public let moveLeft: Int
+        public let deleteCount: Int
+        public let insertion: String
+        public var moveRight: Int { moveLeft }
+    }
+    public let cursorEdit: CursorEdit
+    /// Canonical suffix replacement, retained for expected-text/verification consumers.
     public let deleteCount: Int
     public let insertion: String
     public let expectedText: String
@@ -55,7 +65,17 @@ public struct KeyboardReplacementPlan: Equatable, Sendable {
 
         let insertion = replacement + suffix
         let expected = prefix + insertion
-        return KeyboardReplacementPlan(deleteCount: removed.utf16.count, insertion: insertion,
+        let old = Array(removed), new = Array(insertion)
+        var commonPrefix = 0
+        while commonPrefix < min(old.count, new.count), old[commonPrefix] == new[commonPrefix] { commonPrefix += 1 }
+        var commonSuffix = 0
+        while commonSuffix < min(old.count, new.count) - commonPrefix,
+              old[old.count - commonSuffix - 1] == new[new.count - commonSuffix - 1] { commonSuffix += 1 }
+        // Every retained/deleted original character has already passed the one-unit
+        // typing gate above. Newly inserted Unicode stays on its exact payload boundary.
+        let edit = CursorEdit(moveLeft: commonSuffix, deleteCount: old.count - commonPrefix - commonSuffix,
+                              insertion: String(new[commonPrefix..<(new.count - commonSuffix)]))
+        return KeyboardReplacementPlan(cursorEdit: edit, deleteCount: removed.utf16.count, insertion: insertion,
                                        expectedText: expected, expectedCaret: expected.utf16.count)
     }
 

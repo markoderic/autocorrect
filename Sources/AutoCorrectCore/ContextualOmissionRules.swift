@@ -8,6 +8,18 @@ public enum ContextualOmissionRules {
     private static let withVerbs: Set<String> = ["agree", "agrees", "agreed", "help", "helps", "helped", "work", "works", "worked", "working", "deal", "deals", "dealing", "go", "goes", "went", "come", "comes", "came", "start", "starts", "started", "done", "happy", "fine", "okay", "ok", "wrong", "talk", "talking", "speak", "speaking"]
     private static let subjects: Set<String> = ["he", "she", "it", "user", "person", "customer", "client", "someone", "anyone", "everyone", "nobody", "somebody", "everybody"]
     private static let menuKinds: Set<String> = ["file", "edit", "view", "help", "format", "tools", "window", "context", "application", "dropdown"]
+    private static let singularThings: Set<String> = ["app", "application", "program", "tool", "feature", "button", "keyboard", "computer", "device", "code", "script", "website", "site", "system", "fix", "test", "plan"]
+    private static let bareVerbs: Set<String> = ["work", "help", "start", "stop", "open", "close", "run", "load", "save", "show", "change", "fix", "make", "look", "seem", "feel", "want", "need", "have", "get", "do", "support", "correct", "respond"]
+
+    /// A complete third-person singular subject, not a noun elsewhere in a sentence
+    /// ("watch it work", "the app's woks", "two woks", archaic "thou doest").
+    private static func singularSubject(_ prefix: String) -> Bool {
+        let clause = prefix.components(separatedBy: CharacterSet(charactersIn: ".!?\n")).last ?? prefix
+        let text = clause.trimmingCharacters(in: .whitespaces).lowercased()
+        if ["it", "he", "she", "this", "that"].contains(text) { return true }
+        let words = text.split(separator: " ").map(String.init)
+        return words.count == 2 && ["the", "this", "that", "my", "your", "our"].contains(words[0]) && singularThings.contains(words[1])
+    }
 
     private static func omission(_ source: String, of target: String) -> Bool {
         guard source.count + 1 == target.count else { return false }
@@ -34,7 +46,13 @@ public enum ContextualOmissionRules {
             let before = i > 0 && plainGap(i-1, i) ? tokens[i-1].lowercased() : ""
             let after = i + 1 < tokens.count && plainGap(i, i+1) ? tokens[i+1].lowercased() : ""
             var replacement: String?
-            if word == "os", ns.substring(from: NSMaxRange(range)).hasPrefix(" "), !["import", "from", "module", "called", "named"].contains(before) {
+            if word == "doest", singularSubject(prefix), bareVerbs.contains(after) {
+                // The reported omitted-n contraction needs a modern subject + base verb;
+                // never insert negation into a standalone dictionary word or archaic prose.
+                replacement = "doesn't"
+            } else if word != "work", omission(word, of: "works"), singularSubject(prefix) {
+                replacement = "works"
+            } else if word == "os", ns.substring(from: NSMaxRange(range)).hasPrefix(" "), !["import", "from", "module", "called", "named"].contains(before) {
                 replacement = "so"
             } else if omission(word, of: "with"), objects.contains(after),
                       prefix.isEmpty || withVerbs.contains(before) {

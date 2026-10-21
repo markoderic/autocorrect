@@ -48,11 +48,11 @@ Then open **AutoCorrect** from **Applications** and follow steps 3–4 above. Th
 
 **This is an early release.** App compatibility varies; it cannot correct text in every app or field. See [validation and known limits](docs/VALIDATION.md).
 
-## Development fix: 0.3.18
+## Development fixes: 0.3.19
 
-The installed development build adds automatic keyboard-listener recovery after interruptions, sleep and session changes. A lightweight health check retries unavailable input access; the status explains permission or Secure Input pauses. Interrupted corrections are discarded so they cannot replay against later typing. [Recovery tests and limits](docs/INPUT-RECOVERY-0.3.18.md).
+The installed development build preserves unchanged text during corrections, instead of erasing and retyping the whole word plus following text. It adds short missing-double repairs such as `helo` → `hello` and contextual repairs such as `it woks` → `it works` and `it doest work` → `it doesn't work`. `its a problem` and `lets fix this` use the existing contextual contractions; valid `its screen`, `she lets me` and `two woks` remain unchanged. [Editing and accuracy validation](docs/EDIT-INTEGRITY-0.3.19.md).
 
-It also retains the 0.3.17 fix for disappearing initial letters in Claude: automatic capitalization waits for a completed word. The owner physically confirmed the earlier fix preserves both paused `a` and Shift+A. [First-letter validation](docs/FIRST-LETTER-FIX-0.3.17.md).
+It retains automatic listener recovery from 0.3.18 and the unfinished-first-letter protection from 0.3.17. The owner confirmed corrections resumed after the recovery update. [Recovery tests and limits](docs/INPUT-RECOVERY-0.3.18.md).
 
 The public download below remains **0.3.16**. Publishing these development fixes is pending restoration of the local Apple notarization credential; no unnotarized replacement was uploaded.
 

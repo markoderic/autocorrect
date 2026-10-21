@@ -22,11 +22,18 @@ enum KeyboardEventSequence {
             }
             return true
         }
-        for _ in 0..<plan.deleteCount {
+        let edit = plan.cursorEdit
+        for _ in 0..<edit.moveLeft {
+            guard append(key: CGKeyCode(kVK_LeftArrow)) else { return nil }
+        }
+        for _ in 0..<edit.deleteCount {
             guard append(key: CGKeyCode(kVK_Delete)) else { return nil }
         }
-        for character in plan.insertion {
+        for character in edit.insertion {
             guard append(key: 0, text: String(character)) else { return nil }
+        }
+        for _ in 0..<edit.moveRight {
+            guard append(key: CGKeyCode(kVK_RightArrow)) else { return nil }
         }
         return events
     }

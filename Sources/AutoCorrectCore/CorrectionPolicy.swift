@@ -330,7 +330,7 @@ public enum CorrectionPolicy {
     /// kiding -> kidding preserves every letter; riding/hiding change the first one.
     /// Only dictionary-ranked candidates participate, and competing repairs block it.
     static func repeatedConsonantReplacement(for original: String, guesses: [String]) -> String? {
-        guard (5...32).contains(original.count), isPlainWord(original), hasSafeCase(original),
+        guard (4...32).contains(original.count), isPlainWord(original), hasSafeCase(original),
               original.allSatisfy({ $0.asciiValue != nil && $0.isLetter }) else { return nil }
         let source = original.lowercased()
         let consonants = Set("bcdfgklmnprstz")
@@ -356,6 +356,11 @@ public enum CorrectionPolicy {
             return target
         })
         guard candidates.count == 1, let target = candidates.first else { return nil }
+        // Short omissions such as helo/hapy need a top-two, single missing double.
+        // Longer forms retain the existing ranked multi-double repair allowance.
+        if source.count == 4 {
+            guard target.count == 5, guesses.prefix(2).contains(where: { $0.lowercased() == target }) else { return nil }
+        }
         return original.first?.isUppercase == true ? target.prefix(1).uppercased() + target.dropFirst() : target
     }
 

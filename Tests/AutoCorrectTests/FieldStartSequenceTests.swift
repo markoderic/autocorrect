@@ -78,6 +78,20 @@ final class FieldStartSequenceTests: XCTestCase {
         preferences.asksBeforeCorrecting = false
     }
 
+    func testReportedContractionsAndOmissionsAfterFirstWordCapitalization() {
+        for fast in [false, true] {
+            for (typed, expected) in [("its a problem ", "It's a problem "), ("its working now ", "It's working now "),
+                                      ("lets also fix this ", "Let's also fix this "), ("it woks ", "It works "),
+                                      ("it doest work ", "It doesn't work "), ("helo ", "Hello ")] {
+                engine.invalidate(); host.text = ""
+                if fast { typeFast(typed) } else { type(typed) }
+                // Consecutive word and context edits finish over successive bounded passes.
+                for _ in 0..<8 { engine.processBoundaries(using: host.snapshot()) }
+                XCTAssertEqual(host.text, expected, "fast=\(fast): \(typed)")
+            }
+        }
+    }
+
     func testPausedInitialNeverReachesDestructiveTransport() {
         for prefix in ["a", "A", "h", "i", "ab", "apple", "(a", " a"] {
             engine.invalidate(); host.text = ""
